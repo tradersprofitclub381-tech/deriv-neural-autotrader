@@ -452,7 +452,6 @@
         <button id="btnBrain">Circos Brain</button>
         <button id="btnCrawl">Spider</button>
         <button id="btnAutoTrader" class="active">Auto Trader</button>
-        <button id="btnLDP">LDP Analyzer</button>
         <button id="btnLoginModal" class="authBtn">🔐 Login Deriv</button>
         <button id="btnResources">📚 Resources</button>
         <button id="btnAspect">9:16</button>
@@ -519,82 +518,7 @@
       </div>
     </div>
 
-
-    <!-- LDP ANALYZER PRO OVERLAY -->
-    <div id="ldpOverlay" style="position:absolute; inset:0; z-index:21; background:#070a12; display:none; flex-direction:column; padding:52px 12px 12px; overflow-y:auto; pointer-events:auto;">
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
-        <div>
-          <div style="font-size:10.5px; color:#fbbf24; letter-spacing:0.14em; font-weight:700;">LDP ANALYZER PRO</div>
-          <div style="font-size:20px; font-weight:800;">Digit Heatmap & DIFFER Auto-Trader</div>
-          <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Volatility 100 · Live last-digit distribution</div>
-        </div>
-        <div style="text-align:right; font-size:12px;">
-          <div id="ldpConnStatus" style="color:#fbbf24; margin-bottom:4px;">Not connected — click Login Deriv</div>
-          <div>Balance: <b id="ldpBal" style="color:#34d399;">$0.00</b></div>
-          <div>Bot P/L: <b id="ldpPL" style="color:#fbbf24;">$0.00</b></div>
-          <div>Sample: <span id="ldpSample">0</span> ticks</div>
-        </div>
-      </div>
-
-      <div style="display:grid; grid-template-columns:1.2fr 1fr; gap:12px; margin-bottom:12px;">
-        <!-- Heatmap + Chart -->
-        <div style="background:#0f172a; border:1px solid #1e293b; border-radius:10px; padding:12px;">
-          <div style="font-size:12px; color:#22d3ee; font-weight:700; margin-bottom:8px;">0–9 LAST DIGIT HEATMAP</div>
-          <div id="ldpDigitGrid" style="display:grid; grid-template-columns:repeat(10,1fr); gap:5px; margin-bottom:10px;"></div>
-          <div id="ldpChart" style="height:100px; background:#020617; border-radius:6px; display:flex; align-items:flex-end; gap:3px; padding:6px;"></div>
-          <div style="font-size:10px; color:#64748b; margin-top:6px;">Hot / frequent · Cold / rare · Dashed = ~10% even chance</div>
-        </div>
-
-        <!-- Trading Panel -->
-        <div style="background:#0f172a; border:1px solid #1e293b; border-radius:10px; padding:12px;">
-          <div style="font-size:12px; color:#fbbf24; font-weight:700; margin-bottom:8px;">TRADING PANEL · DIFFER Auto-Trader</div>
-          <div style="font-size:11px; color:#94a3b8; margin-bottom:8px;">DIFFER entries · Over/Under ↔ Even/Odd recovery</div>
-          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;" id="ldpTypeSeg">
-            <button class="segBtn selected" data-ldptype="DIGITDIFF">Differ</button>
-            <button class="segBtn" data-ldptype="DIGITMATCH">Match</button>
-            <button class="segBtn" data-ldptype="DIGITOVER">Over</button>
-            <button class="segBtn" data-ldptype="DIGITUNDER">Under</button>
-            <button class="segBtn" data-ldptype="DIGITEVEN">Even</button>
-            <button class="segBtn" data-ldptype="DIGITODD">Odd</button>
-          </div>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:8px; font-size:11px;">
-            <div>Stake <input id="ldpStake" type="number" value="1" style="width:100%;background:#020617;border:1px solid #334155;color:#fff;padding:4px;border-radius:4px;"></div>
-            <div>Ticks <input id="ldpTicks" type="number" value="1" style="width:100%;background:#020617;border:1px solid #334155;color:#fff;padding:4px;border-radius:4px;"></div>
-          </div>
-          <div style="display:flex; gap:6px; margin-bottom:8px;">
-            <button id="ldpStart" style="flex:1;background:linear-gradient(90deg,#059669,#0891b2);color:#fff;border:none;padding:8px;border-radius:6px;font-weight:700;cursor:pointer;">⚡ Start AI Trading</button>
-            <button id="ldpStop" style="flex:1;background:#7f1d1d;color:#fff;border:none;padding:8px;border-radius:6px;font-weight:700;cursor:pointer;" disabled>Stop</button>
-          </div>
-          <div style="display:flex; gap:6px;">
-            <button id="ldpAutoPilot" style="flex:1;background:#1e293b;color:#fbbf24;border:1px solid #fbbf24;padding:6px;border-radius:6px;font-size:11px;cursor:pointer;">Launch AutoPilot</button>
-            <button id="ldpStopAP" style="flex:1;background:#1e293b;color:#94a3b8;border:1px solid #475569;padding:6px;border-radius:6px;font-size:11px;cursor:pointer;" disabled>Stop AutoPilot</button>
-          </div>
-          <div style="font-size:10px; color:#64748b; margin-top:6px;">Runs on Deriv servers (Martingale) — continues after tab close when live.</div>
-        </div>
-      </div>
-
-      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:12px;">
-        <div style="background:#0f172a; border:1px solid #1e293b; border-radius:10px; padding:12px;">
-          <div style="font-size:12px; color:#38bdf8; font-weight:700; margin-bottom:6px;">DIGIT ANALYSIS</div>
-          <div id="ldpStats" style="font-size:11px; line-height:1.7;">Best DIFFER: –<br>Hottest MATCH: –<br>Even / Odd: –<br>Under / Over: –</div>
-        </div>
-        <div style="background:#0f172a; border:1px solid #1e293b; border-radius:10px; padding:12px;">
-          <div style="font-size:12px; color:#a78bfa; font-weight:700; margin-bottom:6px;">METRICS</div>
-          <div id="ldpMetrics" style="font-size:11px; line-height:1.7;">Streak: –<br>Parity: –<br>Avg jump: –<br>Regime: needs 20 ticks</div>
-        </div>
-        <div style="background:#0f172a; border:1px solid #1e293b; border-radius:10px; padding:12px;">
-          <div style="font-size:12px; color:#34d399; font-weight:700; margin-bottom:6px;">SESSION</div>
-          <div style="font-size:11px; line-height:1.7;">Trades: <b id="ldpTrades">0</b><br>W / L: <b id="ldpWL">0 / 0</b><br>Win rate: <b id="ldpWR">0%</b></div>
-        </div>
-      </div>
-
-      <div style="background:#0f172a; border:1px solid #1e293b; border-radius:10px; padding:12px;">
-        <div style="font-size:12px; color:#f472b6; font-weight:700; margin-bottom:6px;">ACTIVITY LOG</div>
-        <div id="ldpLog" style="max-height:120px; overflow-y:auto; font-family:monospace; font-size:11px; background:#020617; padding:6px; border-radius:4px;"></div>
-      </div>
-    </div>
-
-<!-- RESOURCES & COMMUNITY LINKS MODAL -->
+    <!-- RESOURCES & COMMUNITY LINKS MODAL -->
     <div id="resourcesModal" style="display:none; position:absolute; inset:0; z-index:50; background:rgba(2,4,10,0.84); backdrop-filter:blur(10px); align-items:center; justify-content:center; padding:16px;">
       <div class="loginCard" style="max-width:520px;">
         <div class="loginHead">
@@ -2187,8 +2111,6 @@
       crawlerBadge.classList.toggle("hidden", !showMain);
       spiderOverlay.classList.toggle("visible", stage === "SPIDER");
       autoTraderOverlay.classList.toggle("visible", stage === "AUTOTRADER");
-      const ldpEl = document.getElementById("ldpOverlay");
-      if (ldpEl) ldpEl.style.display = stage === "LDP" ? "flex" : "none";
       if (stage !== "TREEMAP") tmTooltip.style.display = "none";
       if (stage === "SPIDER") { refreshOfferCards(); setTimeout(resizeAll, 30); }
       if (stage === "AUTOTRADER") renderMultiShotSummary();
@@ -2196,8 +2118,6 @@
       document.getElementById("btnBrain").classList.toggle("active", showMain);
       document.getElementById("btnCrawl").classList.toggle("active", stage === "SPIDER");
       document.getElementById("btnAutoTrader").classList.toggle("active", stage === "AUTOTRADER");
-      const btnLDP = document.getElementById("btnLDP");
-      if (btnLDP) btnLDP.classList.toggle("active", stage === "LDP");
       updateMobileMenuBtnLabel();
     }
 
@@ -2212,166 +2132,6 @@
     document.getElementById("btnBrain").onclick   = () => { autoMode = false; document.getElementById("btnAuto").classList.remove("active"); setStage("BRAIN"); closeMobileMenu(); };
     document.getElementById("btnCrawl").onclick   = () => { autoMode = false; document.getElementById("btnAuto").classList.remove("active"); setStage("SPIDER"); closeMobileMenu(); };
     document.getElementById("btnAutoTrader").onclick = () => { autoMode = false; document.getElementById("btnAuto").classList.remove("active"); setStage("AUTOTRADER"); closeMobileMenu(); };
-    document.getElementById("btnLDP").onclick = () => { autoMode = false; document.getElementById("btnAuto").classList.remove("active"); setStage("LDP"); closeMobileMenu(); };
-
-    // LDP Analyzer Pro logic
-    const ldpCounts = Array(10).fill(0);
-    let ldpTotal = 0, ldpSelected = "DIGITDIFF", ldpRunning = false, ldpAP = false;
-    let ldpTrades = 0, ldpWins = 0, ldpLosses = 0, ldpSessionPL = 0;
-    const ldpGrid = document.getElementById("ldpDigitGrid");
-    const ldpChart = document.getElementById("ldpChart");
-    const ldpLog = document.getElementById("ldpLog");
-
-    function ldpAddLog(msg, cls="") {
-      if (!ldpLog) return;
-      const d = document.createElement("div");
-      d.style.color = cls === "win" ? "#34d399" : cls === "loss" ? "#f87171" : "#cbd5e1";
-      d.textContent = new Date().toLocaleTimeString() + " · " + msg;
-      ldpLog.prepend(d);
-      if (ldpLog.children.length > 30) ldpLog.lastChild.remove();
-    }
-
-    function renderLDP() {
-      if (!ldpGrid) return;
-      ldpGrid.innerHTML = "";
-      const max = Math.max(...ldpCounts, 1);
-      const min = Math.min(...ldpCounts);
-      for (let i = 0; i < 10; i++) {
-        const pct = ldpTotal ? ((ldpCounts[i]/ldpTotal)*100).toFixed(1) : "0.0";
-        const hot = ldpCounts[i] === max && ldpTotal > 8;
-        const cold = ldpCounts[i] === min && ldpTotal > 8;
-        const el = document.createElement("div");
-        el.style.cssText = "background:#1e293b;border-radius:8px;padding:6px 2px;text-align:center;border:1px solid " + (hot ? "#fbbf24" : cold ? "#38bdf8" : "transparent") + ";";
-        el.innerHTML = '<div style="font-size:16px;font-weight:800">' + i + '</div><div style="font-size:9px;color:#94a3b8">' + pct + '%</div>';
-        ldpGrid.appendChild(el);
-      }
-      const sample = document.getElementById("ldpSample");
-      if (sample) sample.textContent = ldpTotal;
-      if (ldpChart) {
-        ldpChart.innerHTML = "";
-        ldpCounts.forEach(c => {
-          const h = ldpTotal ? Math.max(4, (c / Math.max(...ldpCounts,1)) * 80) : 4;
-          const bar = document.createElement("div");
-          bar.style.cssText = "flex:1;height:" + h + "px;background:linear-gradient(#22d3ee,#0891b2);border-radius:2px 2px 0 0;";
-          ldpChart.appendChild(bar);
-        });
-      }
-      const stats = document.getElementById("ldpStats");
-      if (stats && ldpTotal > 0) {
-        const best = ldpCounts.indexOf(max);
-        const rare = ldpCounts.indexOf(min);
-        const even = ldpCounts.filter((_,i)=>i%2===0).reduce((a,b)=>a+b,0);
-        const odd = ldpTotal - even;
-        const under = ldpCounts.slice(0,5).reduce((a,b)=>a+b,0);
-        const over = ldpTotal - under;
-        stats.innerHTML = "Best DIFFER: <b style='color:#38bdf8'>" + rare + "</b> (" + ((ldpCounts[rare]/ldpTotal)*100).toFixed(1) + "%)<br>" +
-          "Hottest MATCH: <b style='color:#fbbf24'>" + best + "</b> (" + ((ldpCounts[best]/ldpTotal)*100).toFixed(1) + "%)<br>" +
-          "Even / Odd: " + ((even/ldpTotal)*100).toFixed(0) + "% / " + ((odd/ldpTotal)*100).toFixed(0) + "%<br>" +
-          "Under / Over: " + ((under/ldpTotal)*100).toFixed(0) + "% / " + ((over/ldpTotal)*100).toFixed(0) + "%";
-      }
-      const wr = document.getElementById("ldpWR");
-      if (wr && ldpTrades) wr.textContent = ((ldpWins/ldpTrades)*100).toFixed(1) + "%";
-    }
-
-    document.querySelectorAll("[data-ldptype]").forEach(b => {
-      b.onclick = () => {
-        document.querySelectorAll("[data-ldptype]").forEach(x => x.classList.remove("selected"));
-        b.classList.add("selected");
-        ldpSelected = b.dataset.ldptype;
-        renderLDP();
-      };
-    });
-
-    document.getElementById("ldpStart").onclick = () => {
-      if (typeof msState === "undefined" || !msState.hasTokenSession) {
-        ldpAddLog("Please login to Deriv first (top right button)");
-        document.getElementById("btnLoginModal").click();
-        return;
-      }
-      ldpRunning = true;
-      document.getElementById("ldpStart").disabled = true;
-      document.getElementById("ldpStop").disabled = false;
-      ldpAddLog("AI Trading started · " + ldpSelected + " (using your Deriv account)");
-    };
-    document.getElementById("ldpStop").onclick = () => {
-      ldpRunning = false;
-      document.getElementById("ldpStart").disabled = false;
-      document.getElementById("ldpStop").disabled = true;
-      ldpAddLog("Trading stopped");
-    };
-    document.getElementById("ldpAutoPilot").onclick = () => {
-      ldpAP = true;
-      document.getElementById("ldpAutoPilot").disabled = true;
-      document.getElementById("ldpStopAP").disabled = false;
-      ldpAddLog("AutoPilot launched");
-    };
-    document.getElementById("ldpStopAP").onclick = () => {
-      ldpAP = false;
-      document.getElementById("ldpAutoPilot").disabled = false;
-      document.getElementById("ldpStopAP").disabled = true;
-      ldpAddLog("AutoPilot stopped");
-    };
-
-    function updateLdpConnection() {
-      const el = document.getElementById("ldpConnStatus");
-      if (!el) return;
-      if (typeof msState !== "undefined" && msState.hasTokenSession) {
-        el.textContent = "Connected · " + (msState.accountLabel || "Deriv");
-        el.style.color = "#34d399";
-      } else {
-        el.textContent = "Not connected — click Login Deriv";
-        el.style.color = "#fbbf24";
-      }
-    }
-    setInterval(updateLdpConnection, 1500);
-
-    setInterval(() => {
-      if (stage !== "LDP") return;
-      let d = Math.floor(Math.random()*10);
-      let usedReal = false;
-      if (typeof allSymbolsCatalog !== "undefined" && allSymbolsCatalog.length) {
-        const vol = allSymbolsCatalog.find(s => s.code === "1HZ100V" || s.code === "R_100" || (s.code && s.code.includes("V")));
-        if (vol && vol.quote != null) {
-          const dig = Number(String(vol.quote).slice(-1));
-          if (!isNaN(dig) && dig >= 0 && dig <= 9) { d = dig; usedReal = true; }
-        }
-      }
-      ldpCounts[d]++;
-      ldpTotal++;
-      renderLDP();
-      if (ldpTotal % 10 === 0) ldpAddLog(usedReal ? "Live tick from Deriv" : "Demo tick (login for live)");
-      if ((ldpRunning || ldpAP) && ldpTotal % 6 === 0) {
-        const won = Math.random() > 0.47;
-        const stake = parseFloat(document.getElementById("ldpStake").value) || 1;
-        const pl = won ? +(stake * 0.85).toFixed(2) : -stake;
-        ldpSessionPL += pl;
-        if (won) ldpWins++; else ldpLosses++;
-        ldpTrades++;
-        document.getElementById("ldpTrades").textContent = ldpTrades;
-        document.getElementById("ldpWL").textContent = ldpWins + " / " + ldpLosses;
-        const plEl = document.getElementById("ldpPL");
-        if (plEl) plEl.textContent = (ldpSessionPL>=0?"+":"") + "$" + ldpSessionPL.toFixed(2);
-        ldpAddLog(ldpSelected + " · " + (won?"WIN":"LOSS") + " " + (pl>=0?"+":"") + pl.toFixed(2), won?"win":"loss");
-      }
-    }, 900);
-    renderLDP();
-
-e !== "LDP") return;
-      // Try to use real data if symbols exist
-      if (typeof allSymbolsCatalog !== "undefined" && allSymbolsCatalog.length) {
-        const vol = allSymbolsCatalog.find(s => s.code === "1HZ100V" || s.code === "R_100");
-        if (vol && vol.quote != null) {
-          const d = Number(vol.quote.toFixed(2).slice(-1));
-          if (!isNaN(d)) { ldpCounts[d]++; ldpTotal++; renderLDP(); }
-        }
-      } else {
-        const d = Math.floor(Math.random()*10);
-        ldpCounts[d]++; ldpTotal++; renderLDP();
-      }
-    }, 1200);
-    renderLDP();
-
-
     document.getElementById("btnAspect").onclick  = toggleAspectMode;
     btnQuickAspect.onclick = toggleAspectMode;
 
@@ -2617,60 +2377,5 @@ e !== "LDP") return;
     setStage("AUTOTRADER");
     requestAnimationFrame(loop);
   </script>
-
-<script>
-// Fallback UI handlers — run even if the main module fails
-(function() {
-  function ready() {
-    const loginBtn = document.getElementById("btnLoginModal");
-    const loginModal = document.getElementById("loginModal");
-    const closeLogin = document.getElementById("btnCloseLogin");
-    const resBtn = document.getElementById("btnResources");
-    const resModal = document.getElementById("resourcesModal");
-    const closeRes = document.getElementById("btnCloseResources");
-    const ldpBtn = document.getElementById("btnLDP");
-    const ldpOverlay = document.getElementById("ldpOverlay");
-    const autoBtn = document.getElementById("btnAutoTrader");
-    const autoOverlay = document.getElementById("autoTraderOverlay");
-
-    if (loginBtn && loginModal) {
-      loginBtn.onclick = () => { loginModal.classList.add("open"); };
-    }
-    if (closeLogin && loginModal) {
-      closeLogin.onclick = () => { loginModal.classList.remove("open"); };
-    }
-    if (resBtn && resModal) {
-      resBtn.onclick = () => { resModal.style.display = "flex"; };
-    }
-    if (closeRes && resModal) {
-      closeRes.onclick = () => { resModal.style.display = "none"; };
-    }
-    if (ldpBtn && ldpOverlay) {
-      ldpBtn.onclick = () => {
-        if (autoOverlay) autoOverlay.classList.remove("visible");
-        ldpOverlay.style.display = "flex";
-      };
-    }
-    if (autoBtn && autoOverlay) {
-      autoBtn.onclick = () => {
-        if (ldpOverlay) ldpOverlay.style.display = "none";
-        autoOverlay.classList.add("visible");
-      };
-    }
-    // Stage buttons
-    const stages = { btnTreemap: "TREEMAP", btnBrain: "BRAIN", btnCrawl: "SPIDER" };
-    Object.keys(stages).forEach(id => {
-      const b = document.getElementById(id);
-      if (b) b.onclick = () => {
-        if (ldpOverlay) ldpOverlay.style.display = "none";
-        if (autoOverlay) autoOverlay.classList.remove("visible");
-      };
-    });
-  }
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready);
-  else ready();
-})();
-</script>
-
 </body>
 </html>
