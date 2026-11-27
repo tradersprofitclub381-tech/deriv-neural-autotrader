@@ -468,7 +468,10 @@
         </div>
 
         <div class="loginSub">
-          App ID <b style="color:#fbbf24">34O6Q2rxr5yHXyvFnKST0</b>. When logged in with your token, trading strictly follows your selected mode: <b>REAL</b> (Real only), <b>DEMO</b> (Demo only), or <b>AUTO</b> (auto-selects account &amp; auto-trades).
+          <b>OAuth 2.0 Login</b> sends you to Deriv, then returns you <b>straight back to this app</b> so you can place trades.<br><br>
+          <span style="color:#fbbf24">Add this Redirect URI in your Deriv app settings:</span><br>
+          <code id="oauthRedirectDisplay" style="color:#6ee7b7;word-break:break-all;font-size:10.5px">loading…</code><br><br>
+          Or paste a PAT token below. Mode controls which account is used: <b>REAL</b> / <b>DEMO</b> / <b>AUTO</b>.
         </div>
 
         <div class="loginField">
@@ -497,7 +500,7 @@
 
         <div class="loginActions">
           <button class="primaryBtn" id="btnLoginPat">Connect &amp; Save PAT</button>
-          <button class="oauthBtn" id="btnLoginOAuth">OAuth 2.0 Login</button>
+          <button class="oauthBtn" id="btnLoginOAuth">🔐 Login with Deriv (returns here)</button>
         </div>
 
         <div class="loginField" id="acctSwitchWrap" style="display:none">
@@ -1509,43 +1512,98 @@
       return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
     }
 
+
+    function getOAuthRedirectUri() {
+      let uri = window.location.origin + window.location.pathname;
+      if (uri.endsWith("/index.html")) uri = uri.slice(0, -10);
+      if (!uri.endsWith("/")) uri += "/";
+      return uri;
+    }
+    function updateOAuthRedirectDisplay() {
+      const el = document.getElementById("oauthRedirectDisplay");
+      if (el) el.textContent = getOAuthRedirectUri();
+    }
+
     async function startOAuth2PKCE() {
-      if (window.location.protocol === "file:") { setLoginStatus("OAuth 2.0 requires http://localhost or HTTPS registered on developers.deriv.com. Paste a PAT token above for file://!", true); return; }
-      const appId = document.getElementById("loginAppId").value.trim() || DEFAULT_DERIV_APP_ID, redirectUri = `${window.location.origin}${window.location.pathname}`;
-      const codeVerifier = base64UrlEncode(crypto.getRandomValues(new Uint8Array(48))), digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(codeVerifier));
-      const codeChallenge = base64UrlEncode(digest), oauthState = base64UrlEncode(crypto.getRandomValues(new Uint8Array(16)));
+      if (window.location.protocol === "file:") { setLoginStatus("OAuth 2.0 requires http://localhost or HTTPS. Register this site's URL on developers.deriv.com, or paste a PAT token above.", true); return; }
+      const appId = document.getElementById("loginAppId").value.trim() || DEFAULT_DERIV_APP_ID;
+      // Normalize redirect URI so GitHub Pages and local both work consistently
+      let redirectUri = `${window.location.origin}${window.location.pathname}`;
+      if (redirectUri.endsWith("/index.html")) redirectUri = redirectUri.slice(0, -10);
+      if (!redirectUri.endsWith("/")) redirectUri += "/";
+      const codeVerifier = base64UrlEncode(crypto.getRandomValues(new Uint8Array(48)));
+      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(codeVerifier));
+      const codeChallenge = base64UrlEncode(digest);
+      const oauthState = base64UrlEncode(crypto.getRandomValues(new Uint8Array(16)));
       sessionStorage.setItem(PKCE_STORAGE_KEY, JSON.stringify({ codeVerifier, oauthState, appId, redirectUri }));
       const authUrl = new URL("https://auth.deriv.com/oauth2/auth");
-      authUrl.searchParams.set("response_type", "code"); authUrl.searchParams.set("client_id", appId); authUrl.searchParams.set("redirect_uri", redirectUri);
-      authUrl.searchParams.set("scope", "trade"); authUrl.searchParams.set("code_challenge", codeChallenge); authUrl.searchParams.set("code_challenge_method", "S256"); authUrl.searchParams.set("state", oauthState);
-      window.location.href = authUrl.toString();
+      authUrl.searchParams.set("response_type", "code");
+      authUrl.searchParams.set("client_id", appId);
+      authUrl.searchParams.set("redirect_uri", redirectUri);
+      authUrl.searchParams.set("scope", "trade");
+      authUrl.searchParams.set("code_challenge", codeChallenge);
+      authUrl.searchParams.set("code_challenge_method", "S256");
+      authUrl.searchParams.set("state", oauthState);
+      setLoginStatus("Redirecting to Deriv login… you will be returned to this app after authentication.");
+      setTimeout(() => { window.location.href = authUrl.toString(); }, 600);
     }
 
     async function handleOAuthCallbackOrRestoreSession() {
-      const params = new URLSearchParams(window.location.search), authCode = params.get("code"), retState = params.get("state");
+      const params = new URLSearchParams(window.location.search);
+      const authCode = params.get("code");
+      const retState = params.get("state");
       if (authCode && retState) {
         loginModal.classList.add("open");
+        setLoginStatus("Deriv login successful — returning you to the app and connecting account…");
         try {
-          const savedPkce = JSON.parse(sessionStorage.getItem(PKCE_STORAGE_KEY) || "null"); sessionStorage.removeItem(PKCE_STORAGE_KEY);
-          if (!savedPkce || savedPkce.oauthState !== retState) throw new Error("OAuth state mismatch.");
-          const body = new URLSearchParams({ grant_type: "authorization_code", client_id: savedPkce.appId, code: authCode, code_verifier: savedPkce.codeVerifier, redirect_uri: savedPkce.redirectUri });
-          const tokRes = await fetch("https://auth.deriv.com/oauth2/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
+          const savedPkce = JSON.parse(sessionStorage.getItem(PKCE_STORAGE_KEY) || "null");
+          sessionStorage.removeItem(PKCE_STORAGE_KEY);
+          if (!savedPkce || savedPkce.oauthState !== retState) throw new Error("OAuth state mismatch. Please try login again.");
+          const body = new URLSearchParams({
+            grant_type: "authorization_code",
+            client_id: savedPkce.appId,
+            code: authCode,
+            code_verifier: savedPkce.codeVerifier,
+            redirect_uri: savedPkce.redirectUri
+          });
+          const tokRes = await fetch("https://auth.deriv.com/oauth2/token", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body
+          });
           const tokJson = await tokRes.json();
           if (!tokRes.ok || !tokJson.access_token) throw new Error(tokJson.error_description || "Token exchange failed.");
+          // Clean URL so refresh does not re-trigger
           window.history.replaceState({}, document.title, window.location.pathname);
-          await loginWithDerivToken({ token: tokJson.access_token, authMethod: "oauth", appId: savedPkce.appId, expiresInSec: tokJson.expires_in });
-        } catch (err) { setLoginStatus(`OAuth callback error: ${err.message}`, true); }
+          await loginWithDerivToken({
+            token: tokJson.access_token,
+            authMethod: "oauth",
+            appId: savedPkce.appId,
+            expiresInSec: tokJson.expires_in
+          });
+          setLoginStatus("Logged in successfully. You are back in the app — you can now place trades.");
+          setTimeout(() => loginModal.classList.remove("open"), 1800);
+        } catch (err) {
+          setLoginStatus(`OAuth callback error: ${err.message}`, true);
+        }
         return;
       }
+      // Restore previous session if present
       try {
-        const raw = localStorage.getItem(SESSION_STORAGE_KEY); if (!raw) return;
+        const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+        if (!raw) return;
         const sess = JSON.parse(raw);
         if (sess.accountMode) msState.accountMode = sess.accountMode;
         syncAccountModeUI();
         if (sess.expiresAt && Date.now() >= sess.expiresAt) { localStorage.removeItem(SESSION_STORAGE_KEY); return; }
         if (sess.token) {
           document.getElementById("loginAppId").value = sess.appId || DEFAULT_DERIV_APP_ID;
-          await loginWithDerivToken({ token: sess.token, authMethod: sess.authMethod || "pat", appId: sess.appId || DEFAULT_DERIV_APP_ID, preferredAccountId: sess.accountId });
+          await loginWithDerivToken({
+            token: sess.token,
+            authMethod: sess.authMethod || "pat",
+            appId: sess.appId || DEFAULT_DERIV_APP_ID,
+            preferredAccountId: sess.accountId
+          });
         }
       } catch (_) {}
     }
@@ -1574,8 +1632,8 @@
       };
     });
 
-    document.getElementById("btnLoginModal").onclick = () => { closeMobileMenu(); loginModal.classList.add("open"); };
-    document.getElementById("atOpenLoginBtn").onclick = () => loginModal.classList.add("open");
+    document.getElementById("btnLoginModal").onclick = () => { closeMobileMenu(); updateOAuthRedirectDisplay(); loginModal.classList.add("open"); };
+    document.getElementById("atOpenLoginBtn").onclick = () => { updateOAuthRedirectDisplay(); loginModal.classList.add("open"); };
     document.getElementById("btnCloseLogin").onclick = () => loginModal.classList.remove("open");
 
     // Resources modal handlers
