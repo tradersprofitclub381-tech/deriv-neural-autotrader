@@ -2617,5 +2617,60 @@ e !== "LDP") return;
     setStage("AUTOTRADER");
     requestAnimationFrame(loop);
   </script>
+
+<script>
+// Fallback UI handlers — run even if the main module fails
+(function() {
+  function ready() {
+    const loginBtn = document.getElementById("btnLoginModal");
+    const loginModal = document.getElementById("loginModal");
+    const closeLogin = document.getElementById("btnCloseLogin");
+    const resBtn = document.getElementById("btnResources");
+    const resModal = document.getElementById("resourcesModal");
+    const closeRes = document.getElementById("btnCloseResources");
+    const ldpBtn = document.getElementById("btnLDP");
+    const ldpOverlay = document.getElementById("ldpOverlay");
+    const autoBtn = document.getElementById("btnAutoTrader");
+    const autoOverlay = document.getElementById("autoTraderOverlay");
+
+    if (loginBtn && loginModal) {
+      loginBtn.onclick = () => { loginModal.classList.add("open"); };
+    }
+    if (closeLogin && loginModal) {
+      closeLogin.onclick = () => { loginModal.classList.remove("open"); };
+    }
+    if (resBtn && resModal) {
+      resBtn.onclick = () => { resModal.style.display = "flex"; };
+    }
+    if (closeRes && resModal) {
+      closeRes.onclick = () => { resModal.style.display = "none"; };
+    }
+    if (ldpBtn && ldpOverlay) {
+      ldpBtn.onclick = () => {
+        if (autoOverlay) autoOverlay.classList.remove("visible");
+        ldpOverlay.style.display = "flex";
+      };
+    }
+    if (autoBtn && autoOverlay) {
+      autoBtn.onclick = () => {
+        if (ldpOverlay) ldpOverlay.style.display = "none";
+        autoOverlay.classList.add("visible");
+      };
+    }
+    // Stage buttons
+    const stages = { btnTreemap: "TREEMAP", btnBrain: "BRAIN", btnCrawl: "SPIDER" };
+    Object.keys(stages).forEach(id => {
+      const b = document.getElementById(id);
+      if (b) b.onclick = () => {
+        if (ldpOverlay) ldpOverlay.style.display = "none";
+        if (autoOverlay) autoOverlay.classList.remove("visible");
+      };
+    });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready);
+  else ready();
+})();
+</script>
+
 </body>
 </html>
