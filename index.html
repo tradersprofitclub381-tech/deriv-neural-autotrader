@@ -1,16 +1,2322 @@
+
 <!DOCTYPE html>
-<html>
-<head><title>Deriv Neural Auto Trader</title></head>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deriv Neural Circos Brain, Treemap, Spider &amp; Multi-Shot Auto Trader</title>
+  <style>
+    :root {
+      --bg: #04060c;
+      --border: rgba(148, 163, 184, 0.22);
+      --cyan: #38bdf8;
+      --pink: #f472b6;
+      --green: #34d399;
+      --amber: #fbbf24;
+      --red: #f87171;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #010205;
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #stageWrap {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background: var(--bg);
+      overflow: hidden;
+      transition: width 0.35s ease, height 0.35s ease;
+    }
+    #stageWrap.portrait {
+      width: min(94vw, calc(94vh * 9 / 16));
+      height: min(94vh, calc(94vw * 16 / 9));
+      border-radius: 18px;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      box-shadow: 0 0 60px rgba(56, 189, 248, 0.14);
+    }
+
+    #webglCanvas, #fxCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    #fxCanvas { pointer-events: none; z-index: 8; }
+
+    #topBar {
+      position: absolute;
+      top: 10px; left: 10px; right: 10px;
+      z-index: 32;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      pointer-events: none;
+    }
+    #topBar > * { pointer-events: auto; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(6, 10, 20, 0.92); backdrop-filter: blur(8px);
+      border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; font-size: 11px;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); flex-shrink: 0; }
+    .dot.live { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .btnRow { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+
+    button, select, input {
+      background: rgba(15, 23, 42, 0.94);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 5px 9px;
+      font-size: 11px;
+      font-family: inherit;
+    }
+    button, select { cursor: pointer; }
+    button:hover, select:hover { border-color: var(--cyan); color: #fff; }
+    button.active { background: rgba(56, 189, 248, 0.22); border-color: var(--cyan); color: #7dd3fc; }
+    button.authBtn { border-color: rgba(52, 211, 153, 0.55); color: #6ee7b7; }
+    button.authBtn.loggedIn { background: rgba(6, 78, 59, 0.45); border-color: #34d399; color: #fff; }
+
+    /* Mobile Tap-Scroll Menu Controls (Hidden on Desktop) */
+    #mobileNavControls { display: none; align-items: center; gap: 5px; }
+    #btnMobileMenu {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(15, 23, 42, 0.96);
+      border: 1px solid rgba(56, 189, 248, 0.55);
+      color: #7dd3fc; font-weight: 800; padding: 6px 10px; border-radius: 6px;
+    }
+    #btnQuickAspect { padding: 6px 8px; font-size: 11px; }
+
+    /* Shared Mobile Tap-Scroll-Open Drawer Styles */
+    #stageWrap.portrait #topBar,
+    .isMobile #topBar { flex-wrap: nowrap; }
+
+    #stageWrap.portrait #mobileNavControls,
+    .isMobile #mobileNavControls { display: inline-flex; }
+
+    #stageWrap.portrait .pill,
+    .isMobile .pill { min-width: 0; flex: 1; }
+    #stageWrap.portrait #wsLabel,
+    .isMobile #wsLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    #stageWrap.portrait .btnRow,
+    .isMobile .btnRow {
+      position: absolute;
+      top: 40px;
+      left: 0;
+      right: 0;
+      flex-direction: column;
+      flex-wrap: nowrap;
+      align-items: stretch;
+      gap: 7px;
+      background: rgba(6, 10, 22, 0.98);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      border-radius: 10px;
+      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.82);
+      max-height: 0;
+      opacity: 0;
+      padding: 0 10px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      pointer-events: none;
+      transition: max-height 0.28s ease, opacity 0.22s ease, padding 0.22s ease;
+    }
+    #stageWrap.portrait #topBar.menuOpen .btnRow,
+    .isMobile #topBar.menuOpen .btnRow {
+      max-height: min(68vh, 420px);
+      opacity: 1;
+      padding: 10px;
+      pointer-events: auto;
+    }
+    #stageWrap.portrait .btnRow > button,
+    #stageWrap.portrait .btnRow > select,
+    .isMobile .btnRow > button,
+    .isMobile .btnRow > select {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 12px;
+      text-align: left;
+      flex-shrink: 0;
+      border-radius: 7px;
+    }
+
+    /* Account Mode Switcher Pills */
+    .modeSwitch {
+      display: inline-flex; background: rgba(8, 12, 24, 0.95);
+      border: 1px solid var(--border); border-radius: 6px; padding: 2px; gap: 2px;
+    }
+    .modeBtn { border: none; background: transparent; padding: 4px 10px; font-size: 11px; font-weight: 800; border-radius: 4px; color: var(--muted); }
+    .modeBtn.selReal { background: rgba(220, 38, 38, 0.35); color: #fecaca; border: 1px solid #ef4444; }
+    .modeBtn.selDemo { background: rgba(5, 150, 105, 0.35); color: #a7f3d0; border: 1px solid #10b981; }
+    .modeBtn.selAuto { background: rgba(124, 58, 237, 0.4); color: #ddd6fe; border: 1px solid #a78bfa; }
+
+    #tmTooltip {
+      position: fixed; z-index: 40; pointer-events: none; display: none;
+      background: rgba(6, 10, 20, 0.96); border: 1px solid rgba(251, 191, 36, 0.7);
+      border-radius: 6px; padding: 8px 11px; font-size: 11px; line-height: 1.5;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
+    }
+
+    /* LOGIN MODAL */
+    #loginModal {
+      position: absolute; inset: 0; z-index: 50;
+      background: rgba(2, 4, 10, 0.84); backdrop-filter: blur(10px);
+      display: none; align-items: center; justify-content: center; padding: 16px;
+    }
+    #loginModal.open { display: flex; }
+    .loginCard {
+      width: min(470px, 100%); max-height: 90vh; overflow-y: auto;
+      background: #080d1b; border: 1px solid rgba(56, 189, 248, 0.45);
+      border-radius: 12px; padding: 18px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75);
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .loginHead { display: flex; justify-content: space-between; align-items: center; }
+    .loginTitle { font-size: 15px; font-weight: 800; color: #93c5fd; }
+    .loginSub { font-size: 11px; color: var(--muted); line-height: 1.45; }
+    .loginField { display: flex; flex-direction: column; gap: 4px; font-size: 10.5px; color: #cbd5e1; }
+    .loginField input, .loginField select { width: 100%; padding: 8px 10px; font-size: 11.5px; }
+    .loginActions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .primaryBtn { flex: 1; padding: 9px 12px; font-weight: 800; font-size: 11.5px; background: linear-gradient(90deg, #059669, #0284c7); border: 1px solid #38bdf8; color: #fff; }
+    .oauthBtn { flex: 1; padding: 9px 12px; font-weight: 800; font-size: 11.5px; background: linear-gradient(90deg, #be185d, #7c3aed); border: 1px solid #f472b6; color: #fff; }
+    .loginStatusMsg { font-size: 11px; padding: 7px 9px; border-radius: 6px; background: rgba(15, 23, 42, 0.9); border: 1px solid var(--border); color: #cbd5e1; display: none; line-height: 1.4; }
+    .loginStatusMsg.show { display: block; }
+
+    /* LEFT: 5-COLUMN VERTICAL NEURAL PIPELINE */
+    #pipelineWrap {
+      position: absolute; top: 50px; left: 10px; bottom: 12px; width: min(46vw, 585px);
+      z-index: 15; display: flex; flex-direction: column;
+      transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+    #stageWrap.portrait #pipelineWrap, .isMobile #pipelineWrap { width: calc(100% - 20px); bottom: 64%; }
+    #pipelineWrap.hidden { opacity: 0; pointer-events: none; transform: translateX(-16px); }
+
+    .pipeHeaderGrid {
+      display: grid; grid-template-columns: 102px 14px 96px 14px 92px 14px 114px 14px 98px;
+      align-items: center; font-size: 10px; letter-spacing: 0.04em; color: var(--muted);
+      padding: 0 2px 6px; border-bottom: 1px solid rgba(148, 163, 184, 0.16); margin-bottom: 4px;
+    }
+    .pipeHeaderGrid span { text-align: center; white-space: nowrap; }
+    .pipeHeaderGrid span:first-child { text-align: left; }
+
+    #pipeScroll, #predScroll, #spiderScroll { flex: 1; overflow-y: auto; overflow-x: auto; padding-right: 4px; }
+    #pipeScroll::-webkit-scrollbar, #predScroll::-webkit-scrollbar, #spiderScroll::-webkit-scrollbar,
+    .atScroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    #pipeScroll::-webkit-scrollbar-thumb, #predScroll::-webkit-scrollbar-thumb, #spiderScroll::-webkit-scrollbar-thumb,
+    .atScroll::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.3); border-radius: 3px; }
+
+    .pipeRow { display: grid; grid-template-columns: 102px 14px 96px 14px 92px 14px 114px 14px 98px; align-items: center; height: 40px; margin-bottom: 4px; cursor: pointer; }
+    .pipeCell { height: 36px; background: rgba(8, 13, 25, 0.92); border: 1px solid rgba(148, 163, 184, 0.22); border-radius: 4px; padding: 3px 6px; display: flex; flex-direction: column; justify-content: center; font-size: 10px; line-height: 1.25; overflow: hidden; }
+    .pipeRow:hover .pipeCell, .pipeRow.active .pipeCell { border-color: rgba(244, 114, 182, 0.78); background: rgba(24, 16, 38, 0.94); }
+    .pipeGap { height: 36px; }
+    .cTop { display: flex; justify-content: space-between; align-items: center; gap: 3px; font-weight: 700; white-space: nowrap; font-size: 10.5px; }
+    .cSub { display: flex; justify-content: space-between; align-items: center; gap: 3px; font-size: 10px; color: var(--muted); white-space: nowrap; }
+    .atrBlink { border-color: #fde047 !important; background: rgba(250, 204, 21, 0.26) !important; box-shadow: 0 0 14px rgba(250, 204, 21, 0.75); color: #fef08a; }
+
+    /* RIGHT: AUTO-GROWING PREDICTION LIST */
+    #predPanel {
+      position: absolute; top: 50px; right: 10px; bottom: 12px; width: min(23vw, 310px);
+      z-index: 15; display: flex; flex-direction: column;
+      background: rgba(6, 10, 20, 0.86); backdrop-filter: blur(8px);
+      border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 8px; padding: 8px;
+      transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+    #stageWrap.portrait #predPanel, .isMobile #predPanel { top: 66%; left: 10px; width: calc(100% - 20px); }
+    #predPanel.hidden { opacity: 0; pointer-events: none; transform: translateX(16px); }
+    .predHeader { display: flex; justify-content: space-between; align-items: center; font-size: 10.5px; letter-spacing: 0.06em; color: var(--amber); margin-bottom: 6px; font-weight: 700; }
+    .predSummary { display: flex; gap: 5px; flex-wrap: wrap; font-size: 10px; padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px solid rgba(148, 163, 184, 0.16); }
+    .sumChip { padding: 2px 6px; border-radius: 4px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(148, 163, 184, 0.2); font-weight: 700; }
+    .predRow { display: grid; grid-template-columns: 12px 68px 1fr 42px; gap: 6px; align-items: center; height: 40px; margin-bottom: 4px; padding: 0 7px; background: rgba(10, 15, 28, 0.9); border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 4px; font-size: 10.5px; cursor: pointer; }
+    .predRow:hover, .predRow.active { border-color: rgba(244, 114, 182, 0.78); background: rgba(28, 16, 42, 0.92); }
+    .predRow.tickFlash { box-shadow: 0 0 12px rgba(56, 189, 248, 0.45); border-color: rgba(56, 189, 248, 0.75); }
+    .predSwatch { width: 10px; height: 16px; border-radius: 2px; }
+    .predCode { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; }
+    .predSignal { font-size: 10px; font-weight: 700; padding: 3px 5px; border-radius: 3px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .predConf { text-align: right; font-size: 10px; color: #cbd5e1; font-variant-numeric: tabular-nums; }
+
+    /* DIRECTORY DRAWER & CRAWLER BADGE */
+    #symbolsDrawer {
+      position: absolute; top: 52px; right: 10px; bottom: 10px; width: min(390px, calc(100% - 20px));
+      z-index: 35; background: rgba(6, 10, 20, 0.97); backdrop-filter: blur(12px);
+      border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 10px;
+      display: none; flex-direction: column; padding: 12px;
+    }
+    #symbolsDrawer.open { display: flex; }
+    .drawerHead { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+    #symSearch { flex: 1; padding: 7px 9px; outline: none; font-size: 11px; }
+    #symSummary { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+    #symList { flex: 1; overflow-y: auto; padding-right: 4px; }
+    .symGroupTitle { position: sticky; top: 0; background: #080d1a; font-size: 11px; font-weight: 700; padding: 6px 4px; border-bottom: 1px solid var(--border); margin-top: 6px; z-index: 2; }
+    .symItem { display: grid; grid-template-columns: 84px 1fr 72px 48px; gap: 6px; align-items: center; padding: 6px 4px; font-size: 11px; border-bottom: 1px solid rgba(148, 163, 184, 0.08); cursor: pointer; }
+    .symItem:hover { background: rgba(56, 189, 248, 0.14); }
+    .symCode { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .symName { color: #cbd5e1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .symQuote { text-align: right; color: var(--cyan); font-variant-numeric: tabular-nums; }
+    .symState { text-align: right; font-size: 10px; font-weight: 700; }
+    .symState.open { color: var(--green); }
+    .symState.closed { color: var(--red); }
+
+    #crawlerBadge {
+      position: absolute; z-index: 16; padding: 4px 10px; font-size: 11px; font-weight: 700;
+      letter-spacing: 0.12em; color: #fde68a; background: rgba(15, 18, 30, 0.94);
+      border: 1px solid rgba(251, 191, 36, 0.65); border-radius: 4px;
+      box-shadow: 0 0 18px rgba(251, 191, 36, 0.25); transform: translate(-50%, -50%);
+      pointer-events: none; transition: opacity 0.35s ease;
+    }
+    #crawlerBadge.hidden { opacity: 0; }
+
+    /* SPIDER & AUTO TRADER OVERLAYS */
+    #spiderOverlay, #autoTraderOverlay {
+      position: absolute; inset: 0; z-index: 20;
+      background: #070a12; display: flex; flex-direction: column;
+      padding: 52px 14px 12px; opacity: 0; pointer-events: none;
+      transition: opacity 0.35s ease;
+    }
+    #autoTraderOverlay {
+      z-index: 22;
+      background: radial-gradient(circle at top right, rgba(56, 189, 248, 0.08), transparent 45%), #060913;
+    }
+    #spiderOverlay.visible, #autoTraderOverlay.visible { opacity: 1; pointer-events: auto; }
+    #stageWrap.portrait #autoTraderOverlay, .isMobile #autoTraderOverlay { overflow-y: auto; }
+
+    .docHeader { border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 6px; }
+    .docKicker { font-size: 10.5px; color: var(--amber); letter-spacing: 0.12em; margin-bottom: 4px; }
+    .docTitleRow { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+    .docTicker { font-size: 24px; font-weight: 800; line-height: 1.05; }
+    .docName { font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .docMeta { font-size: 11px; line-height: 1.45; text-align: right; color: #e2e8f0; }
+    .docMeta span { color: var(--muted); margin-right: 6px; }
+
+    .spTableHead {
+      display: grid; grid-template-columns: minmax(185px, 1.4fr) 96px 96px 90px 118px 138px 152px 76px;
+      gap: 8px; padding: 6px 10px; font-size: 10px; font-weight: 700; color: var(--muted);
+      background: rgba(15, 23, 42, 0.72); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    }
+    #sheetWrap { position: relative; flex: 1; overflow: hidden; border-bottom: 1px solid rgba(148, 163, 184, 0.2); }
+    #spiderScroll { position: absolute; inset: 0; overflow-y: auto; overflow-x: auto; }
+    #spiderCanvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 6; }
+
+    .spRow {
+      display: grid; grid-template-columns: minmax(185px, 1.4fr) 96px 96px 90px 118px 138px 152px 76px;
+      gap: 8px; align-items: center; padding: 8px 10px; min-height: 46px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.1); font-size: 12px; cursor: pointer;
+    }
+    .spRow:hover { background: rgba(56, 189, 248, 0.09); }
+    .spRow.active { background: rgba(30, 41, 59, 0.78); outline: 1px solid rgba(56, 189, 248, 0.55); }
+    .spSpiderLane { height: 32px; border-left: 1px dashed rgba(148, 163, 184, 0.14); border-right: 1px dashed rgba(148, 163, 184, 0.14); background: rgba(56, 189, 248, 0.02); border-radius: 4px; }
+    .spAsset { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .spIcon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 800; color: #04060c; flex-shrink: 0; }
+    .spOpenDot { width: 15px; height: 15px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; }
+    .spOpenDot.open { background: rgba(52, 211, 153, 0.22); color: #34d399; border: 1px solid #34d399; }
+    .spOpenDot.closed { background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid #475569; }
+    .spAssetTxt { min-width: 0; }
+    .spCode { font-weight: 800; color: #f8fafc; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .spSubName { font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .spPrice { font-weight: 700; color: #f8fafc; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+    .spChg { font-weight: 700; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+    .up { color: #34d399; } .down { color: #f87171; }
+    .spSparkBox { display: flex; flex-direction: column; gap: 2px; }
+    .spTrendLbl { font-size: 10px; font-weight: 700; white-space: nowrap; }
+    .spAskBid { display: flex; flex-direction: column; gap: 3px; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+    .spAbTxt { color: #e2e8f0; white-space: nowrap; }
+    .spMiniBars { display: flex; align-items: flex-end; gap: 3px; height: 12px; }
+    .miniBar { width: 6px; border-radius: 1px; min-height: 3px; }
+    .spRateCol { display: flex; align-items: center; gap: 6px; }
+    .rateBadge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 6px; border-radius: 4px; font-size: 11px; font-weight: 800; background: rgba(30, 58, 138, 0.5); border: 1px solid rgba(96, 165, 250, 0.55); color: #bfdbfe; }
+    .mktBadge { padding: 3px 6px; border-radius: 4px; font-size: 11px; font-weight: 800; background: rgba(251, 191, 36, 0.18); border: 1px solid rgba(251, 191, 36, 0.6); color: #fde047; }
+    .spVolTxt { font-size: 10.5px; color: #cbd5e1; font-weight: 700; }
+    .spShare { text-align: right; font-variant-numeric: tabular-nums; }
+    .spShareVal { font-weight: 700; color: #f8fafc; font-size: 11.5px; }
+    .spShareSub { font-size: 10px; color: var(--muted); }
+
+    #taggedWrap { padding-top: 8px; }
+    .taggedTitle { font-size: 11px; color: var(--amber); font-weight: 700; letter-spacing: 0.12em; margin-bottom: 6px; display: flex; justify-content: space-between; }
+    .taggedGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    #stageWrap.portrait .taggedGrid, .isMobile .taggedGrid { grid-template-columns: repeat(2, 1fr); }
+    .tagCard { background: rgba(12, 17, 30, 0.94); border: 1px solid rgba(148, 163, 184, 0.24); border-radius: 6px; padding: 8px 10px; }
+    .tagHead { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-bottom: 3px; gap: 4px; }
+    .tagBadge { color: var(--cyan); border: 1px solid rgba(56, 189, 248, 0.45); padding: 1px 5px; border-radius: 3px; white-space: nowrap; font-size: 10px; font-weight: 700; }
+    .tagNum { font-size: 14px; font-weight: 800; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tagSub { font-size: 10px; color: #cbd5e1; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* AUTO TRADER */
+    .atTopStats {
+      display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding: 8px 12px; background: rgba(10, 15, 28, 0.92); border: 1px solid var(--border);
+      border-radius: 8px; margin-bottom: 10px;
+    }
+    .atStatGroup { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+    .atStat { display: flex; flex-direction: column; }
+    .atStatLbl { font-size: 10px; color: var(--muted); }
+    .atStatVal { font-size: 14px; font-weight: 800; }
+    .atTokenBox { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+    .atBody { flex: 1; display: grid; grid-template-columns: 1.45fr 1fr; gap: 12px; min-height: 0; }
+    #stageWrap.portrait .atBody, .isMobile .atBody { grid-template-columns: 1fr; overflow: visible; flex: none; }
+
+    .atLeftCol, .atRightCol { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+    .atPanel {
+      background: rgba(10, 15, 28, 0.88); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; min-height: 0;
+    }
+    .atPanelHead { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 11px; font-weight: 700; color: #93c5fd; }
+
+    .msGrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    #stageWrap.portrait .msGrid, .isMobile .msGrid { grid-template-columns: repeat(2, 1fr); }
+
+    .msCard {
+      position: relative; background: rgba(15, 23, 42, 0.88); border: 1px solid rgba(148, 163, 184, 0.25);
+      border-radius: 7px; padding: 8px; cursor: pointer;
+      transition: transform 0.12s, border-color 0.15s, box-shadow 0.15s, background 0.15s;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .msCard:hover { border-color: var(--cyan); }
+    .msCard.disabled { opacity: 0.4; filter: grayscale(0.7); }
+    .msCard.redZone { border-color: rgba(248, 113, 113, 0.85); background: rgba(127, 29, 29, 0.26); }
+    .msCard.firing { border-color: #fde047; box-shadow: 0 0 18px rgba(250, 204, 21, 0.6); transform: scale(1.02); }
+    .msCard.wonFlash { border-color: #34d399; box-shadow: 0 0 14px rgba(52, 211, 153, 0.45); background: rgba(6, 78, 59, 0.35); }
+    .msCard.lostFlash { border-color: #f87171; box-shadow: 0 0 14px rgba(248, 113, 113, 0.45); background: rgba(127, 29, 29, 0.35); }
+    .msCard.cycleDone { border-color: #34d399; background: rgba(6, 78, 59, 0.28); }
+
+    .msTop { display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 800; }
+    .msDigitBox { display: flex; justify-content: space-between; align-items: center; margin: 2px 0; }
+    .msDigit { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 900; background: rgba(52, 211, 153, 0.2); color: #34d399; border: 1px solid #34d399; }
+    .msDigit.red { background: rgba(248, 113, 113, 0.25); color: #fca5a5; border-color: #f87171; }
+    .msQuote { font-size: 10.5px; color: #cbd5e1; font-variant-numeric: tabular-nums; }
+    .msFoot { display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: var(--muted); }
+    .msMultBadge { padding: 1px 5px; border-radius: 3px; font-weight: 800; background: rgba(251, 191, 36, 0.18); color: #fde047; font-size: 10px; }
+
+    .atScroll { flex: 1; overflow-y: auto; min-height: 110px; }
+    .histTable { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .histTable th { text-align: left; padding: 5px 6px; color: var(--muted); border-bottom: 1px solid var(--border); position: sticky; top: 0; background: #0a0f1c; font-size: 10px; }
+    .histTable td { padding: 6px; border-bottom: 1px solid rgba(148, 163, 184, 0.08); }
+
+    .segGroup { display: flex; gap: 4px; flex-wrap: wrap; }
+    .segBtn { flex: 1; padding: 6px 8px; font-size: 11px; font-weight: 700; text-align: center; }
+    .segBtn.selected { background: rgba(56, 189, 248, 0.24); border-color: var(--cyan); color: #fff; }
+    .ctrlRow { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 7px; font-size: 11px; }
+    .ctrlGrid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 8px; }
+    .ctrlField { display: flex; flex-direction: column; gap: 3px; font-size: 10px; color: var(--muted); }
+    .ctrlField input { width: 100%; padding: 5px 6px; font-size: 11px; }
+
+    .fireBtn {
+      width: 100%; padding: 11px; font-size: 13px; font-weight: 900; letter-spacing: 0.06em;
+      background: linear-gradient(90deg, #059669, #0284c7); border: 1px solid #38bdf8; color: #fff;
+      border-radius: 7px; cursor: pointer;
+    }
+    .fireBtn:hover { box-shadow: 0 0 20px rgba(56, 189, 248, 0.45); }
+    .fireBtn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+    .fireBtn.autoRunning { background: linear-gradient(90deg, #be185d, #7c3aed); border-color: #f472b6; }
+    .lastBasketBox { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; padding: 8px; background: rgba(15, 23, 42, 0.75); border-radius: 6px; border: 1px solid var(--border); }
+  </style>
+</head>
 <body>
-<h1>Deriv Neural Circos Brain, Treemap, Spider & Multi-Shot Auto Trader</h1>
-<p>Full dashboard is being uploaded. Resources links:</p>
-<ul>
-<li><a href="https://chat.whatsapp.com/Hbd0vChIC6h92pyUE3kEW4">WhatsApp Group</a></li>
-<li><a href="https://whatsapp.com/channel/0029VbDct0e1iUxZNYY3Si04">WhatsApp Channel</a></li>
-<li><a href="https://track.deriv.me/_JPGg-UNeLM71hit6RV3zsGNd7ZgqdRLk/1/">Deriv Account</a></li>
-<li><a href="https://tinyurl.com/yd96ak7p">MQL5 Seller</a></li>
-<li><a href="https://www.mql5.com/en/users/searchmixed/seller">MQL5 Tools</a></li>
-</ul>
-<p>The complete interactive dashboard HTML is available in the repository. Enable GitHub Pages for live access.</p>
+  <div id="stageWrap">
+    <canvas id="webglCanvas"></canvas>
+    <canvas id="fxCanvas"></canvas>
+
+    <div id="topBar">
+      <div class="pill">
+        <span class="dot" id="wsDot"></span>
+        <span id="wsLabel">Connecting to Deriv...</span>
+      </div>
+
+      <!-- Shown only in Mobile / 9:16 Mode -->
+      <div id="mobileNavControls">
+        <button id="btnMobileMenu">☰ MENU · Auto Trader ▾</button>
+        <button id="btnQuickAspect" title="Toggle Desktop / 9:16 Mobile">🖥️</button>
+      </div>
+
+      <!-- On Desktop: inline bar. On Mobile/9:16: Tap-Scroll-Open Dropdown Menu -->
+      <div class="btnRow" id="mainNavDrawer">
+        <select id="marketSelect" title="Filter market cluster">
+          <option value="ALL">ALL DERIV MARKETS</option>
+          <option value="synthetic_index">Synthetics (Derived)</option>
+          <option value="forex">Forex</option>
+          <option value="indices">Stock Indices</option>
+          <option value="commodities">Commodities</option>
+          <option value="cryptocurrency">Crypto</option>
+          <option value="basket_index">Basket Indices</option>
+        </select>
+        <button id="btnSymbols">Symbols (0)</button>
+        <button id="btnAuto">Auto</button>
+        <button id="btnTreemap">Treemap</button>
+        <button id="btnBrain">Circos Brain</button>
+        <button id="btnCrawl">Spider</button>
+        <button id="btnAutoTrader" class="active">Auto Trader</button>
+        <button id="btnLoginModal" class="authBtn">🔐 Login Deriv</button>
+        <button id="btnResources">📚 Resources</button>
+        <button id="btnAspect">9:16</button>
+      </div>
+    </div>
+
+    <div id="tmTooltip"></div>
+
+    <!-- DERIV LOGIN & STRICT ACCOUNT MODE MODAL -->
+    <div id="loginModal">
+      <div class="loginCard">
+        <div class="loginHead">
+          <div class="loginTitle">🔐 Deriv Login &amp; Account Execution Mode</div>
+          <button id="btnCloseLogin">Close</button>
+        </div>
+
+        <div class="loginSub">
+          App ID <b style="color:#fbbf24">34O6Q2rxr5yHXyvFnKST0</b>. When logged in with your token, trading strictly follows your selected mode: <b>REAL</b> (Real only), <b>DEMO</b> (Demo only), or <b>AUTO</b> (auto-selects account &amp; auto-trades).
+        </div>
+
+        <div class="loginField">
+          <span>EXECUTION ACCOUNT MODE</span>
+          <div class="modeSwitch" style="width:100%">
+            <button class="modeBtn" style="flex:1" data-acmode="real">REAL ONLY</button>
+            <button class="modeBtn" style="flex:1" data-acmode="demo">DEMO ONLY</button>
+            <button class="modeBtn selAuto" style="flex:1" data-acmode="auto">AUTO SELECT &amp; TRADE</button>
+          </div>
+        </div>
+
+        <div class="loginField">
+          <span>DERIV DEVELOPER APP ID</span>
+          <input id="loginAppId" type="text" value="34O6Q2rxr5yHXyvFnKST0" />
+        </div>
+
+        <div class="loginField">
+          <span>PERSONAL ACCESS TOKEN (PAT from developers.deriv.com · scope: trade)</span>
+          <input id="loginPatInput" type="password" placeholder="Paste your Deriv PAT token..." />
+        </div>
+
+        <label style="display:flex;align-items:center;gap:8px;font-size:11px;color:#cbd5e1;cursor:pointer">
+          <input type="checkbox" id="loginRememberChk" checked />
+          <span>Save login, mode &amp; robot settings on this device (localStorage)</span>
+        </label>
+
+        <div class="loginActions">
+          <button class="primaryBtn" id="btnLoginPat">Connect &amp; Save PAT</button>
+          <button class="oauthBtn" id="btnLoginOAuth">OAuth 2.0 Login</button>
+        </div>
+
+        <div class="loginField" id="acctSwitchWrap" style="display:none">
+          <span>ACTIVE DERIV ACCOUNT (FILTERED BY MODE)</span>
+          <select id="loginAcctSelect"></select>
+        </div>
+
+        <div class="loginActions" id="loggedInActions" style="display:none">
+          <button id="btnResetDemo" style="flex:1;border-color:#34d399;color:#6ee7b7">Reset Demo ($10k)</button>
+          <button id="btnLogoutDevice" style="flex:1;border-color:#f87171;color:#fca5a5">Logout &amp; Forget Device</button>
+        </div>
+
+        <div class="loginStatusMsg" id="loginStatusMsg"></div>
+      </div>
+    </div>
+
+    <!-- RESOURCES & COMMUNITY LINKS MODAL -->
+    <div id="resourcesModal" style="display:none; position:absolute; inset:0; z-index:50; background:rgba(2,4,10,0.84); backdrop-filter:blur(10px); align-items:center; justify-content:center; padding:16px;">
+      <div class="loginCard" style="max-width:520px;">
+        <div class="loginHead">
+          <div class="loginTitle">📚 Boom & Crash Resources & Community</div>
+          <button id="btnCloseResources">Close</button>
+        </div>
+        <div class="loginSub" style="margin-bottom:8px;">
+          Join the community, open a Deriv account, and get verified tools for Boom & Crash index trading. Scale trades responsibly.
+        </div>
+        <div style="display:flex; flex-direction:column; gap:10px; font-size:12px;">
+          <a href="https://chat.whatsapp.com/Hbd0vChIC6h92pyUE3kEW4" target="_blank" rel="noopener" style="display:block; padding:10px 12px; background:rgba(15,23,42,0.9); border:1px solid rgba(52,211,153,0.5); border-radius:6px; color:#6ee7b7; text-decoration:none; font-weight:700;">💬 Join WhatsApp Group</a>
+          <a href="https://whatsapp.com/channel/0029VbDct0e1iUxZNYY3Si04" target="_blank" rel="noopener" style="display:block; padding:10px 12px; background:rgba(15,23,42,0.9); border:1px solid rgba(56,189,248,0.5); border-radius:6px; color:#7dd3fc; text-decoration:none; font-weight:700;">📢 WhatsApp Channel</a>
+          <a href="https://track.deriv.me/_JPGg-UNeLM71hit6RV3zsGNd7ZgqdRLk/1/" target="_blank" rel="noopener" style="display:block; padding:10px 12px; background:rgba(15,23,42,0.9); border:1px solid rgba(251,191,36,0.55); border-radius:6px; color:#fde047; text-decoration:none; font-weight:700;">🔗 Open Deriv Account (Boom & Crash)</a>
+          <a href="https://tinyurl.com/yd96ak7p" target="_blank" rel="noopener" style="display:block; padding:10px 12px; background:rgba(15,23,42,0.9); border:1px solid rgba(244,114,182,0.5); border-radius:6px; color:#f9a8d4; text-decoration:none; font-weight:700;">🛒 MQL5 Seller Profile</a>
+          <a href="https://www.mql5.com/en/users/searchmixed/seller" target="_blank" rel="noopener" style="display:block; padding:10px 12px; background:rgba(15,23,42,0.9); border:1px solid rgba(167,139,250,0.5); border-radius:6px; color:#ddd6fe; text-decoration:none; font-weight:700;">🛠️ All Verified Indicators, EAs & Tools</a>
+        </div>
+        <div style="font-size:10.5px; color:var(--muted); margin-top:8px; line-height:1.4;">
+          Boom & Crash indices feature periodic spikes. Always use proper risk management. These links are provided for community and tools access.
+        </div>
+      </div>
+    </div>
+
+    <!-- LEFT: 5-COLUMN VERTICAL NEURAL PIPELINE -->
+    <div id="pipelineWrap" class="hidden">
+      <div class="pipeHeaderGrid">
+        <span>ALL SYMBOLS</span><span></span><span>ASK / BID</span><span></span><span>RSI (14)</span><span></span><span>EMA 200 / 150</span><span></span><span>ATR · 5T BLINK</span>
+      </div>
+      <div id="pipeScroll"></div>
+    </div>
+
+    <!-- RIGHT: AUTO-GROWING PREDICTION LIST -->
+    <div id="predPanel" class="hidden">
+      <div class="predHeader"><span>OVERALL PREDICTION LIST</span><span id="predCountBadge">0 SYM</span></div>
+      <div class="predSummary" id="predSummary">
+        <span class="sumChip" style="color:#f472b6">OB:0</span>
+        <span class="sumChip" style="color:#34d399">OS:0</span>
+        <span class="sumChip" style="color:#38bdf8">BULL:0</span>
+        <span class="sumChip" style="color:#fb923c">BEAR:0</span>
+      </div>
+      <div id="predScroll"></div>
+    </div>
+
+    <!-- Searchable Directory Drawer -->
+    <div id="symbolsDrawer">
+      <div class="drawerHead">
+        <input id="symSearch" type="text" placeholder="Search code or name (e.g. R_100, EURUSD, GOLD, BTC)..." />
+        <button id="btnCloseDrawer">Close</button>
+      </div>
+      <div id="symSummary">Loading active_symbols...</div>
+      <div id="symList"></div>
+    </div>
+
+    <div id="crawlerBadge" class="hidden">CIRCOS HUB</div>
+
+    <!-- SPIDER SECTION -->
+    <div id="spiderOverlay">
+      <div class="docHeader">
+        <div class="docKicker">CRAWLER &middot; LIVE MARKET SCANNER &amp; OFFER STREAM (CLICK ANY ROW)</div>
+        <div class="docTitleRow">
+          <div>
+            <div class="docTicker" id="spTicker">—</div>
+            <div class="docName" id="spName">—</div>
+          </div>
+          <div class="docMeta">
+            <div><span>MARKET TAG</span><b id="spMktCode">S</b></div>
+            <div><span>OFFER API</span><b id="spContract">—</b></div>
+            <div><span>TICKS</span><b id="spTicks">0</b></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="spTableHead">
+        <span>SYMBOL</span>
+        <span style="text-align:center;color:#fbbf24">SPIDER</span>
+        <span>PRICE</span>
+        <span>DAILY %</span>
+        <span>SPARK · EMA200</span>
+        <span>ASK / BID · TICKS</span>
+        <span>VOL · RATING · MKT</span>
+        <span style="text-align:right">SHARE</span>
+      </div>
+
+      <div id="sheetWrap">
+        <div id="spiderScroll"></div>
+        <canvas id="spiderCanvas"></canvas>
+      </div>
+
+      <div id="taggedWrap">
+        <div class="taggedTitle"><span>TAGGED IN THIS READ</span><span id="taggedSymHeader" style="color:#38bdf8">—</span></div>
+        <div class="taggedGrid" id="taggedGrid"></div>
+      </div>
+    </div>
+
+    <!-- MULTI-SHOT VISUAL ROBOT AUTO TRADER -->
+    <div id="autoTraderOverlay" class="visible">
+      <div class="atTopStats">
+        <div class="atStatGroup">
+          <div class="atStat">
+            <span class="atStatLbl">EXECUTION ACCOUNT</span>
+            <span class="atStatVal" id="atAccountLabel" style="color:#38bdf8">PAPER DEMO (NO TOKEN)</span>
+          </div>
+          <div class="atStat">
+            <span class="atStatLbl">BALANCE</span>
+            <span class="atStatVal" id="atBalance">$1,000.00</span>
+          </div>
+          <div class="atStat">
+            <span class="atStatLbl">SESSION P/L</span>
+            <span class="atStatVal" id="atSessionPL">$0.00</span>
+          </div>
+          <div class="atStat">
+            <span class="atStatLbl">MARKETS</span>
+            <span class="atStatVal" id="atMarketCount">10/10</span>
+          </div>
+          <div class="atStat">
+            <span class="atStatLbl">CYCLE PROGRESS</span>
+            <span class="atStatVal" id="atCycleProg" style="color:#fbbf24">0/10 WON</span>
+          </div>
+        </div>
+
+        <div class="atTokenBox">
+          <div class="modeSwitch" title="Select strict trading account mode">
+            <button class="modeBtn" data-acmode="real">REAL</button>
+            <button class="modeBtn" data-acmode="demo">DEMO</button>
+            <button class="modeBtn selAuto" data-acmode="auto">AUTO</button>
+          </div>
+          <select id="atQuickAcctSelect" style="display:none"></select>
+          <button id="atOpenLoginBtn" class="authBtn">🔐 Login Deriv</button>
+          <button id="atBtnReset">Reset Paper</button>
+        </div>
+      </div>
+
+      <div class="atBody">
+        <div class="atLeftCol">
+          <div class="atPanel">
+            <div class="atPanelHead">
+              <span>MULTI-SHOT 10-MARKET BASKET GRID (LIVE TICKS)</span>
+              <div class="btnRow" style="position:static;max-height:none;opacity:1;padding:0;background:none;border:none;box-shadow:none;flex-direction:row;pointer-events:auto">
+                <span id="atTriggerBadge" style="color:#94a3b8;font-size:10px">Red digits: 0</span>
+                <button id="atSelAll" style="width:auto;padding:4px 8px;font-size:10px">All</button>
+                <button id="atSelNone" style="width:auto;padding:4px 8px;font-size:10px">None</button>
+              </div>
+            </div>
+            <div class="msGrid" id="msGrid"></div>
+          </div>
+
+          <div class="atPanel" style="flex:1">
+            <div class="atPanelHead">
+              <span>BASKET EXECUTION HISTORY</span>
+              <span id="atHistCount" style="color:var(--muted)">0 baskets</span>
+            </div>
+            <div class="atScroll">
+              <table class="histTable">
+                <thead>
+                  <tr><th>#</th><th>Time</th><th>Acct</th><th>Contract</th><th>W–L</th><th>Staked</th><th>P/L</th></tr>
+                </thead>
+                <tbody id="atHistBody">
+                  <tr><td colspan="7" style="color:var(--muted);text-align:center;padding:16px">No baskets yet — login &amp; pick REAL / DEMO / AUTO, or test in Paper Mode before login.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="atRightCol">
+          <div class="atPanel" style="gap:8px">
+            <div class="atPanelHead"><span>ROBOT STRATEGY &amp; AUTO-FIRE CONTROLS</span><span id="atBotStatus" style="color:#34d399">IDLE</span></div>
+
+            <div class="ctrlField">
+              <span>TRADE TYPE</span>
+              <div class="segGroup">
+                <button class="segBtn selected" id="msTypeDigits">Digits (Over/Under)</button>
+                <button class="segBtn" id="msTypeRF">Rise / Fall</button>
+              </div>
+            </div>
+
+            <div class="ctrlField">
+              <span>DIRECTION</span>
+              <div class="segGroup" id="msDirGroup">
+                <button class="segBtn selected" data-dir="OVER">Over</button>
+                <button class="segBtn" data-dir="UNDER">Under</button>
+              </div>
+            </div>
+
+            <div class="ctrlField" id="msModeWrap">
+              <span>MODE (DIGIT THRESHOLD &amp; PAYOUT)</span>
+              <div class="segGroup">
+                <button class="segBtn selected" data-mode="SAFE">Safe (90%)</button>
+                <button class="segBtn" data-mode="HIGH">High (80%)</button>
+                <button class="segBtn" data-mode="MAX">Max (50/60%)</button>
+              </div>
+            </div>
+
+            <div class="ctrlRow">
+              <span>Stake per trade (USD)</span>
+              <input id="atStakeInput" type="number" min="0.35" step="0.5" value="2.00" style="width:95px;text-align:right" />
+            </div>
+
+            <div class="ctrlRow" style="color:#cbd5e1;background:rgba(15,23,42,0.7);padding:6px 8px;border-radius:5px">
+              <div>Basket cost: <b id="atBasketCost" style="color:#fbbf24">$20.00</b></div>
+              <div>Each win pays: <b id="atWinPays" style="color:#34d399">+$0.20</b></div>
+            </div>
+
+            <div class="ctrlRow">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                <input type="checkbox" id="atRecoveryChk" />
+                <span>Recovery Cycle (auto-recover losses)</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                <input type="checkbox" id="atZigZagChk" checked />
+                <span>Zig-Zag</span>
+              </label>
+            </div>
+
+            <div class="ctrlGrid3">
+              <div class="ctrlField"><span>Take Profit ($)</span><input id="atTpInput" type="number" placeholder="Off" /></div>
+              <div class="ctrlField"><span>Stop Loss ($)</span><input id="atSlInput" type="number" placeholder="Off" /></div>
+              <div class="ctrlField"><span>Max Baskets</span><input id="atMaxBaskets" type="number" placeholder="Off" /></div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <button class="fireBtn" id="atFireBtn">🔥 FIRE BASKET</button>
+              <button class="fireBtn" id="atAutoFireBtn" style="background:linear-gradient(90deg,#1e293b,#334155);border-color:#64748b">⚡ AUTO-FIRE: OFF</button>
+            </div>
+
+            <div style="font-size:10px;color:var(--muted);line-height:1.4" id="atRuleNote">
+              Token mode enforces strict account routing: REAL trades Real only, DEMO trades Demo only, AUTO auto-selects account &amp; runs auto-selected trading.
+            </div>
+
+            <div class="lastBasketBox">
+              <div><div style="font-size:10px;color:var(--muted)">LAST BASKET P/L</div><strong id="atLastPL" style="font-size:14px">—</strong></div>
+              <div><div style="font-size:10px;color:var(--muted)">WINS</div><strong id="atLastWins" style="font-size:14px;color:#34d399">0</strong></div>
+              <div><div style="font-size:10px;color:var(--muted)">LOSSES</div><strong id="atLastLoss" style="font-size:14px;color:#f87171">0</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="importmap">
+    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+  </script>
+
+  <script type="module">
+    import * as THREE from "three";
+
+    // =========================================================================
+    // 0. DERIV APP CONFIG & LOCAL DEVICE STORAGE KEYS
+    // =========================================================================
+    const DEFAULT_DERIV_APP_ID = "34O6Q2rxr5yHXyvFnKST0";
+    const SESSION_STORAGE_KEY  = "deriv_autotrader_session_v1";
+    const SETTINGS_STORAGE_KEY = "deriv_autotrader_settings_v1";
+    const PKCE_STORAGE_KEY     = "deriv_pkce_temp_v1";
+
+    // =========================================================================
+    // 1. MARKET METADATA & INDICATOR ENGINE
+    // =========================================================================
+    const GROUP_META = {
+      synthetic_index: { code: "S",  short: "SYNT", name: "Derived Synthetics", color: "#34d399" },
+      forex:           { code: "F",  short: "FORX", name: "Forex",              color: "#38bdf8" },
+      indices:         { code: "ND", short: "INDX", name: "Stock Indices",      color: "#fbbf24" },
+      stock:           { code: "SX", short: "STCK", name: "Stocks",             color: "#e879f9" },
+      stocks:          { code: "SX", short: "STCK", name: "Stocks",             color: "#e879f9" },
+      commodities:     { code: "CM", short: "CMDT", name: "Commodities",        color: "#fb923c" },
+      cryptocurrency:  { code: "CR", short: "CRYP", name: "Cryptocurrencies",   color: "#a78bfa" },
+      basket_index:    { code: "BK", short: "BSKT", name: "Basket Indices",     color: "#f472b6" },
+      random_index:    { code: "S",  short: "CONT", name: "Continuous Indices", color: "#34d399" },
+      random_daily:    { code: "S",  short: "DALY", name: "Daily Reset",        color: "#fbbf24" },
+      crash_index:     { code: "S",  short: "CRSH", name: "Crash / Boom",       color: "#f472b6" },
+      jump_index:      { code: "S",  short: "JUMP", name: "Jump Indices",       color: "#38bdf8" },
+      step_index:      { code: "S",  short: "STEP", name: "Step Indices",       color: "#a78bfa" },
+      range_break:     { code: "S",  short: "RNGE", name: "Range Break",        color: "#fb923c" },
+      dex:             { code: "S",  short: "DEXX", name: "DEX Indices",        color: "#f87171" },
+      drift_switch:    { code: "S",  short: "DRFT", name: "Drift Switch",       color: "#22d3ee" }
+    };
+
+    const FLAGSHIP_PRIORITY = new Set([
+      "1HZ100V", "R_100", "R_75", "1HZ75V", "BOOM1000", "CRASH1000",
+      "frxEURUSD", "frxGBPUSD", "frxXAUUSD", "cryBTCUSD", "cryETHUSD",
+      "OTC_NDX", "OTC_SP500", "JD10", "JD50"
+    ]);
+
+    function getGroupMeta(key) {
+      if (GROUP_META[key]) return GROUP_META[key];
+      const clean = (key || "OTHER").replace(/_/g, " ");
+      return { code: clean.slice(0, 2).toUpperCase(), short: clean.slice(0, 4).toUpperCase(), name: clean, color: "#818cf8" };
+    }
+
+    function getMarketShortTag(market) {
+      if (market === "synthetic_index") return "S";
+      if (market === "forex") return "F";
+      if (market === "indices") return "ND";
+      if (market === "stock" || market === "stocks") return "SX";
+      return getGroupMeta(market).code;
+    }
+
+    function computeEMA(prices, period) {
+      if (!prices.length) return null;
+      const k = 2 / (period + 1), seedLen = Math.min(period, prices.length);
+      let ema = prices.slice(0, seedLen).reduce((a, b) => a + b, 0) / seedLen;
+      for (let i = seedLen; i < prices.length; i++) ema = prices[i] * k + ema * (1 - k);
+      return ema;
+    }
+
+    function calcRSI(avgGain, avgLoss) {
+      if (avgGain === 0 && avgLoss === 0) return 50;
+      if (avgLoss === 0) return 100;
+      return 100 - 100 / (1 + avgGain / avgLoss);
+    }
+
+    function initIndicators(sym, prices) {
+      if (!prices || prices.length < 2) return;
+      sym.prices = prices.slice(-260); sym.spark = prices.slice(-22);
+      sym.ema50 = computeEMA(sym.prices, 50); sym.ema100 = computeEMA(sym.prices, 100);
+      sym.ema150 = computeEMA(sym.prices, 150); sym.ema200 = computeEMA(sym.prices, 200);
+      sym.recentDeltas = [];
+      for (let i = Math.max(1, prices.length - 8); i < prices.length; i++) sym.recentDeltas.push(prices[i] - prices[i - 1]);
+      let avgGain = 0, avgLoss = 0; const p = sym.prices;
+      for (let i = 1; i < p.length; i++) {
+        const diff = p[i] - p[i - 1], g = diff > 0 ? diff : 0, l = diff < 0 ? -diff : 0;
+        if (i <= 14) { avgGain += g / 14; avgLoss += l / 14; }
+        else { avgGain = (avgGain * 13 + g) / 14; avgLoss = (avgLoss * 13 + l) / 14; }
+      }
+      sym.avgGain = avgGain; sym.avgLoss = avgLoss; sym.rsi = calcRSI(avgGain, avgLoss);
+      let atr = 0, trSum = 0;
+      for (let i = 1; i < p.length; i++) {
+        const tr = Math.abs(p[i] - p[i - 1]); trSum += tr;
+        if (i <= 14) atr += tr / 14; else atr = (atr * 13 + tr) / 14;
+      }
+      sym.atr = atr; sym.atrBaseline = trSum / Math.max(1, p.length - 1);
+      sym.historyLoaded = true;
+    }
+
+    function updateIndicatorsOnTick(sym, price) {
+      const prev = sym.prices.length ? sym.prices[sym.prices.length - 1] : price;
+      sym.prices.push(price); if (sym.prices.length > 260) sym.prices.shift();
+      sym.spark.push(price); if (sym.spark.length > 22) sym.spark.shift();
+      const diff = price - prev;
+      sym.recentDeltas.push(diff); if (sym.recentDeltas.length > 8) sym.recentDeltas.shift();
+      const stepEma = (old, p) => (old !== null ? price * (2 / (p + 1)) + old * (1 - 2 / (p + 1)) : price);
+      sym.ema50 = stepEma(sym.ema50, 50); sym.ema100 = stepEma(sym.ema100, 100);
+      sym.ema150 = stepEma(sym.ema150, 150); sym.ema200 = stepEma(sym.ema200, 200);
+      const g = diff > 0 ? diff : 0, l = diff < 0 ? -diff : 0;
+      sym.avgGain = ((sym.avgGain ?? g) * 13 + g) / 14; sym.avgLoss = ((sym.avgLoss ?? l) * 13 + l) / 14;
+      sym.rsi = calcRSI(sym.avgGain, sym.avgLoss);
+      const tr = Math.abs(diff);
+      sym.atr = sym.atr !== null ? (sym.atr * 13 + tr) / 14 : tr;
+      sym.atrBaseline = sym.atrBaseline ? sym.atrBaseline * 0.98 + tr * 0.02 : tr;
+    }
+
+    function getRsiState(rsi) {
+      if (rsi === null) return { label: "WARMING", color: "#94a3b8" };
+      if (rsi >= 70) return { label: "OVERBOUGHT", color: "#f472b6" };
+      if (rsi <= 30) return { label: "OVERSOLD", color: "#34d399" };
+      if (rsi >= 55) return { label: "BULLISH", color: "#38bdf8" };
+      if (rsi <= 45) return { label: "BEARISH", color: "#fb923c" };
+      return { label: "NEUTRAL", color: "#cbd5e1" };
+    }
+
+    function getAtrState(sym) {
+      if (sym.atr === null) return { label: "WAIT", color: "#94a3b8" };
+      const ratio = sym.atrBaseline > 0 ? sym.atr / sym.atrBaseline : 1;
+      if (ratio >= 1.5) return { label: "HIGH VOL", color: "#f472b6" };
+      if (ratio >= 1.15) return { label: "EXPAND", color: "#fbbf24" };
+      if (ratio <= 0.7) return { label: "QUIET", color: "#94a3b8" };
+      return { label: "NORMAL", color: "#34d399" };
+    }
+
+    function getEmaSignal(sym) {
+      if (sym.ema50 === null || sym.ema100 === null || sym.ema200 === null || sym.quote === null) return { label: "WARMING", dir: "—", color: "#94a3b8" };
+      const q = sym.quote;
+      if (q > sym.ema50 && sym.ema50 > sym.ema100 && sym.ema100 > sym.ema200) return { label: "STRONG UP", dir: "50>100>200", color: "#34d399" };
+      if (q < sym.ema50 && sym.ema50 < sym.ema100 && sym.ema100 < sym.ema200) return { label: "STRONG DN", dir: "50<100<200", color: "#f87171" };
+      if (q >= sym.ema200) return { label: "ABOVE 200", dir: "BULL BIAS", color: "#38bdf8" };
+      return { label: "BELOW 200", dir: "BEAR BIAS", color: "#fb923c" };
+    }
+
+    function getRating(sym) {
+      let score = 50;
+      if (sym.quote !== null && sym.ema200 !== null) score += sym.quote >= sym.ema200 ? 15 : -10;
+      if (sym.ema50 !== null && sym.ema100 !== null) score += sym.ema50 >= sym.ema100 ? 12 : -8;
+      if (sym.rsi !== null) {
+        if (sym.rsi >= 52 && sym.rsi <= 68) score += 14;
+        else if (sym.rsi <= 30) score += 10;
+        else if (sym.rsi >= 75) score -= 8;
+      }
+      score += Math.min(9, Math.floor(sym.ticks / 4));
+      score = Math.max(12, Math.min(99.8, score));
+      return { grade: score >= 85 ? "A" : score >= 70 ? "B" : score >= 52 ? "C" : "F", score: score.toFixed(1) };
+    }
+
+    function getOverallPrediction(sym) {
+      if (sym.rsi === null) return { key: "WAIT", label: "SCANNING...", bg: "rgba(100,116,139,0.2)", color: "#cbd5e1", conf: "—" };
+      const rsi = sym.rsi, emaBull = sym.ema50 !== null && sym.ema200 !== null ? sym.ema50 >= sym.ema200 : true;
+      const atrRatio = sym.atrBaseline > 0 && sym.atr !== null ? sym.atr / sym.atrBaseline : 1;
+      if (rsi >= 70) return { key: "OB", label: "OVERBOUGHT · SELL", bg: "rgba(244,114,182,0.22)", color: "#f472b6", conf: `${Math.min(98, Math.round(68 + (rsi - 70) * 1.1))}%` };
+      if (rsi <= 30) return { key: "OS", label: "OVERSOLD · BUY", bg: "rgba(52,211,153,0.22)", color: "#34d399", conf: `${Math.min(98, Math.round(68 + (30 - rsi) * 1.1))}%` };
+      if (emaBull && rsi >= 54) return { key: "BULL", label: atrRatio > 1.35 ? "BULL BREAKOUT" : "BULLISH · BUY", bg: "rgba(56,189,248,0.22)", color: "#38bdf8", conf: `${Math.min(94, Math.round(58 + (rsi - 50) * 1.2))}%` };
+      if (!emaBull && rsi <= 46) return { key: "BEAR", label: atrRatio > 1.35 ? "BEAR BREAKOUT" : "BEARISH · SELL", bg: "rgba(251,146,60,0.22)", color: "#fb923c", conf: `${Math.min(94, Math.round(58 + (50 - rsi) * 1.2))}%` };
+      if (atrRatio >= 1.45) return { key: "VOL", label: "HIGH VOL · WATCH", bg: "rgba(251,191,36,0.2)", color: "#fbbf24", conf: "66%" };
+      return { key: "NEUT", label: "NEUTRAL · RANGE", bg: "rgba(148,163,184,0.16)", color: "#cbd5e1", conf: "50%" };
+    }
+
+    // =========================================================================
+    // 2. DOM & STATE + MOBILE TAP-SCROLL MENU LOGIC
+    // =========================================================================
+    const stageWrap = document.getElementById("stageWrap");
+    const topBar = document.getElementById("topBar");
+    const btnMobileMenu = document.getElementById("btnMobileMenu");
+    const btnQuickAspect = document.getElementById("btnQuickAspect");
+    const mainNavDrawer = document.getElementById("mainNavDrawer");
+
+    const webglCanvas = document.getElementById("webglCanvas");
+    const fxCanvas = document.getElementById("fxCanvas");
+    const fxCtx = fxCanvas.getContext("2d");
+    const spiderCanvas = document.getElementById("spiderCanvas");
+    const spCtx = spiderCanvas.getContext("2d");
+    const pipelineWrap = document.getElementById("pipelineWrap");
+    const pipeScroll = document.getElementById("pipeScroll");
+    const predPanel = document.getElementById("predPanel");
+    const predScroll = document.getElementById("predScroll");
+    const predSummaryEl = document.getElementById("predSummary");
+    const predCountBadge = document.getElementById("predCountBadge");
+    const crawlerBadge = document.getElementById("crawlerBadge");
+    const spiderOverlay = document.getElementById("spiderOverlay");
+    const spiderScroll = document.getElementById("spiderScroll");
+    const autoTraderOverlay = document.getElementById("autoTraderOverlay");
+    const symbolsDrawer = document.getElementById("symbolsDrawer");
+    const symListEl = document.getElementById("symList");
+    const symSearchEl = document.getElementById("symSearch");
+    const symSummaryEl = document.getElementById("symSummary");
+    const btnSymbols = document.getElementById("btnSymbols");
+    const marketSelect = document.getElementById("marketSelect");
+    const tmTooltip = document.getElementById("tmTooltip");
+
+    let allSymbolsCatalog = [], filteredSymbolsList = [], totalNetworkTicks = 0;
+    let marketFilter = "ALL", stage = "AUTOTRADER", autoMode = false, stageTimer = 0, treemapBlend = 0, hoveredCode = null;
+    let spiderScrollVel = 0, lastSpiderScrollTop = 0, spiderY = 120;
+
+    const nodes = new Map(), clusters = new Map();
+    let circosChords = [];
+    const pipeRowRefs = new Map(), predRowRefs = new Map(), spiderRowRefs = new Map();
+    let selectedCode = null, syncingScroll = false;
+    let activeOffer = { contractType: "—", askPrice: null, payout: null, commission: null, multiplier: null, availableTypes: [], updates: 0 };
+
+    function isMobileInterface() {
+      return stageWrap.classList.contains("portrait") || window.innerWidth <= 780;
+    }
+
+    function updateMobileLayoutClass() {
+      const mobileScreen = window.innerWidth <= 780;
+      stageWrap.classList.toggle("isMobile", mobileScreen);
+      const isPort = stageWrap.classList.contains("portrait");
+      btnQuickAspect.textContent = isPort ? "🖥️" : "📱";
+      document.getElementById("btnAspect").textContent = isPort ? "🖥️ Desktop View" : "📱 Mobile 9:16";
+      if (!isMobileInterface()) closeMobileMenu();
+    }
+
+    function closeMobileMenu() {
+      topBar.classList.remove("menuOpen");
+      updateMobileMenuBtnLabel();
+    }
+
+    function updateMobileMenuBtnLabel() {
+      const names = { TREEMAP: "Treemap", BRAIN: "Circos Brain", CLUSTER_ZOOM: "Circos Brain", SPIDER: "Spider", AUTOTRADER: "Auto Trader" };
+      const isOpen = topBar.classList.contains("menuOpen");
+      btnMobileMenu.textContent = isOpen ? "✕ CLOSE MENU" : `☰ MENU · ${names[stage] || "Menu"} ▾`;
+    }
+
+    btnMobileMenu.onclick = (e) => {
+      e.stopPropagation();
+      topBar.classList.toggle("menuOpen");
+      updateMobileMenuBtnLabel();
+    };
+
+    document.addEventListener("click", (e) => {
+      if (topBar.classList.contains("menuOpen") && !e.target.closest("#topBar")) {
+        closeMobileMenu();
+      }
+    });
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 300);
+    camera.position.set(0, 0, 34);
+    const renderer = new THREE.WebGLRenderer({ canvas: webglCanvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const bgGeo = new THREE.BufferGeometry();
+    const bgPos = new Float32Array(260 * 3);
+    for (let i = 0; i < 260; i++) { bgPos[i * 3] = (Math.random() - 0.5) * 85; bgPos[i * 3 + 1] = (Math.random() - 0.5) * 90; bgPos[i * 3 + 2] = -20 - Math.random() * 40; }
+    bgGeo.setAttribute("position", new THREE.BufferAttribute(bgPos, 3));
+    scene.add(new THREE.Points(bgGeo, new THREE.PointsMaterial({ color: 0x334155, size: 0.18 })));
+
+    function resizeAll() {
+      updateMobileLayoutClass();
+      const w = stageWrap.clientWidth, h = stageWrap.clientHeight;
+      renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+      const dpr = Math.min(window.devicePixelRatio, 2);
+      fxCanvas.width = w * dpr; fxCanvas.height = h * dpr; fxCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const sw = document.getElementById("sheetWrap").clientWidth || w, sh = document.getElementById("sheetWrap").clientHeight || 260;
+      spiderCanvas.width = sw * dpr; spiderCanvas.height = sh * dpr; spCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      layoutTreemap();
+    }
+    window.addEventListener("resize", resizeAll);
+
+    // =========================================================================
+    // 3. SQUARIFIED TREEMAP
+    // =========================================================================
+    function squarify(items, rect) {
+      if (!items.length) return [];
+      const total = items.reduce((s, it) => s + it.weight, 0) || 1, area = rect.w * rect.h;
+      const scaled = items.map((it) => ({ ...it, area: (it.weight / total) * area })).sort((a, b) => b.area - a.area);
+      const results = []; let rem = [...scaled], cur = { ...rect };
+      function worstRatio(row, shortSide) {
+        const s = row.reduce((a, b) => a + b.area, 0), maxA = Math.max(...row.map((r) => r.area)), minA = Math.min(...row.map((r) => r.area));
+        return Math.max(((shortSide * shortSide) * maxA) / (s * s), (s * s) / ((shortSide * shortSide) * minA));
+      }
+      while (rem.length > 0) {
+        const shortSide = Math.min(cur.w, cur.h) || 1, row = [rem[0]]; let i = 1;
+        while (i < rem.length) {
+          const nextRow = [...row, rem[i]];
+          if (worstRatio(nextRow, shortSide) <= worstRatio(row, shortSide)) { row.push(rem[i]); i++; } else break;
+        }
+        rem = rem.slice(row.length);
+        const rowArea = row.reduce((a, b) => a + b.area, 0);
+        if (cur.w >= cur.h) {
+          const colW = rowArea / (cur.h || 1); let y = cur.y;
+          for (const item of row) { const h = item.area / (colW || 1); results.push({ item, x: cur.x, y, w: colW, h }); y += h; }
+          cur = { x: cur.x + colW, y: cur.y, w: cur.w - colW, h: cur.h };
+        } else {
+          const rowH = rowArea / (cur.w || 1); let x = cur.x;
+          for (const item of row) { const w = item.area / (rowH || 1); results.push({ item, x, y: cur.y, w, h: rowH }); x += w; }
+          cur = { x: cur.x, y: cur.y + rowH, w: cur.w, h: cur.h - rowH };
+        }
+      }
+      return results;
+    }
+
+    function layoutTreemap() {
+      if (!clusters.size) return;
+      const w = stageWrap.clientWidth, h = stageWrap.clientHeight, bounds = { x: 6, y: 50, w: w - 12, h: h - 56 };
+      const groupItems = [...clusters.entries()].map(([key, c]) => ({ key, weight: c.nodes.reduce((sum, n) => sum + n.baseWeight, 0) }));
+      for (const gr of squarify(groupItems, bounds)) {
+        const c = clusters.get(gr.item.key);
+        c.treemapRect = { x: gr.x + 2, y: gr.y + 2, w: gr.w - 4, h: gr.h - 4 };
+        const innerRect = { x: gr.x + 3, y: gr.y + 20, w: Math.max(gr.w - 6, 8), h: Math.max(gr.h - 23, 8) };
+        for (const sr of squarify(c.nodes.map((n) => ({ node: n, weight: n.baseWeight })), innerRect)) {
+          sr.item.node.tileRect = { x: sr.x + 1, y: sr.y + 1, w: Math.max(sr.w - 2, 4), h: Math.max(sr.h - 2, 4) };
+        }
+      }
+    }
+
+    // =========================================================================
+    // 4. BUILD PIPELINE, CIRCOS, PREDICTION LIST & SPIDER TABLE
+    // =========================================================================
+    function selectSymbol(code) {
+      selectedCode = code;
+      document.querySelectorAll(".pipeRow.active, .predRow.active, .spRow.active").forEach((el) => el.classList.remove("active"));
+      pipeRowRefs.get(code)?.row.classList.add("active");
+      predRowRefs.get(code)?.row.classList.add("active");
+      spiderRowRefs.get(code)?.row.classList.add("active");
+      subscribeOfferFor(code); enqueueHistory(code); refreshOfferCards();
+    }
+
+    function buildSparklineSVG(points, isBull) {
+      if (!points || points.length < 2) return `<svg width="96" height="20"></svg>`;
+      const min = Math.min(...points), max = Math.max(...points), range = max - min || 1;
+      const pts = points.map((v, i) => `${((i / (points.length - 1)) * 94).toFixed(1)},${(18 - ((v - min) / range) * 16).toFixed(1)}`).join(" ");
+      return `<svg width="96" height="20" viewBox="0 0 96 20"><polyline fill="none" stroke="${isBull ? "#34d399" : "#f87171"}" stroke-width="1.6" points="${pts}"/></svg>`;
+    }
+
+    function buildMiniBarsHTML(deltas) {
+      const list = deltas && deltas.length ? deltas.slice(-6) : [0, 0, 0, 0, 0, 0];
+      const maxAbs = Math.max(...list.map((d) => Math.abs(d)), 1e-6);
+      return list.map((d) => `<span class="miniBar" style="height:${Math.max(3, Math.min(12, Math.round((Math.abs(d) / maxAbs) * 12)))}px;background:${d >= 0 ? "#34d399" : "#f87171"}"></span>`).join("");
+    }
+
+    function buildAllViews() {
+      nodes.clear(); clusters.clear(); circosChords = [];
+      pipeScroll.innerHTML = ""; predScroll.innerHTML = ""; spiderScroll.innerHTML = "";
+      pipeRowRefs.clear(); predRowRefs.clear(); spiderRowRefs.clear();
+
+      const filtered = allSymbolsCatalog
+        .filter((s) => (marketFilter === "ALL" ? true : s.market === marketFilter))
+        .sort((a, b) => ((b.isOpen ? 10 : 0) + (FLAGSHIP_PRIORITY.has(b.code) ? 5 : 0)) - ((a.isOpen ? 10 : 0) + (FLAGSHIP_PRIORITY.has(a.code) ? 5 : 0)));
+      filteredSymbolsList = filtered;
+      if (!filtered.length) return;
+
+      predCountBadge.textContent = `${filtered.length} SYM`;
+      const pipeFrag = document.createDocumentFragment(), predFrag = document.createDocumentFragment(), spiderFrag = document.createDocumentFragment();
+      const groupCounters = new Map(), total = filtered.length;
+
+      filtered.forEach((sym, idx) => {
+        const hue = Math.round((idx / Math.max(total, 1)) * 320), circosColor = `hsl(${hue}, 88%, 58%)`;
+        sym.circosHue = hue; sym.circosColor = circosColor;
+        const gKey = marketFilter === "ALL" ? (sym.market || "other") : (sym.submarket || sym.market || "other");
+        const rank = groupCounters.get(gKey) || 0; groupCounters.set(gKey, rank + 1);
+        const weight = (sym.isOpen ? 24 : 4) * Math.pow(rank + 1, -0.68) + (FLAGSHIP_PRIORITY.has(sym.code) ? 6 : 0);
+
+        const pRow = document.createElement("div");
+        pRow.className = "pipeRow" + (sym.code === selectedCode ? " active" : "");
+        pRow.innerHTML = `
+          <div class="pipeCell" style="border-left: 2px solid ${circosColor}">
+            <div class="cTop"><span style="color:${circosColor}">${sym.code}</span><span style="font-size:10px;color:${sym.isOpen ? "#34d399" : "#f87171"}">${sym.isOpen ? "OPN" : "CLS"}</span></div>
+            <div class="cSub"><span>${sym.market.slice(0, 4).toUpperCase()}</span><span class="v-ticks">${sym.ticks}t</span></div>
+          </div><div class="pipeGap"></div>
+          <div class="pipeCell"><div class="cTop"><span>A:</span><span class="v-ask" style="color:#38bdf8">—</span></div><div class="cSub"><span>B:</span><span class="v-bid" style="color:#cbd5e1">—</span></div></div><div class="pipeGap"></div>
+          <div class="pipeCell"><div class="cTop"><span class="v-rsi">—</span><span class="v-rsist" style="font-size:10px">WAIT</span></div><div class="cSub"><span>RSI14</span><span>ST</span></div></div><div class="pipeGap"></div>
+          <div class="pipeCell"><div class="cTop"><span>200:</span><span class="v-e200">—</span></div><div class="cSub"><span>150:</span><span class="v-e150">—</span><span class="v-emast">—</span></div></div><div class="pipeGap"></div>
+          <div class="pipeCell v-atrcell"><div class="cTop"><span class="v-atr">—</span><span class="v-atrst" style="font-size:10px">WAIT</span></div><div class="cSub"><span>ATR</span><span class="v-blinkcnt">0/5</span></div></div>`;
+        pRow.onclick = () => selectSymbol(sym.code);
+        pipeRowRefs.set(sym.code, {
+          row: pRow, cells: [...pRow.querySelectorAll(".pipeCell")],
+          vTicks: pRow.querySelector(".v-ticks"), vAsk: pRow.querySelector(".v-ask"), vBid: pRow.querySelector(".v-bid"),
+          vRsi: pRow.querySelector(".v-rsi"), vRsiSt: pRow.querySelector(".v-rsist"),
+          vE200: pRow.querySelector(".v-e200"), vE150: pRow.querySelector(".v-e150"), vEmaSt: pRow.querySelector(".v-emast"),
+          vAtrCell: pRow.querySelector(".v-atrcell"), vAtr: pRow.querySelector(".v-atr"), vAtrSt: pRow.querySelector(".v-atrst"), vBlinkCnt: pRow.querySelector(".v-blinkcnt")
+        });
+        pipeFrag.appendChild(pRow);
+
+        const rRow = document.createElement("div");
+        rRow.className = "predRow" + (sym.code === selectedCode ? " active" : "");
+        rRow.innerHTML = `<span class="predSwatch" style="background:${circosColor}"></span><span class="predCode" style="color:${circosColor}">${sym.code}</span><span class="predSignal">SCANNING</span><span class="predConf">—</span>`;
+        rRow.onclick = () => selectSymbol(sym.code);
+        predRowRefs.set(sym.code, { row: rRow, signalEl: rRow.querySelector(".predSignal"), confEl: rRow.querySelector(".predConf") });
+        predFrag.appendChild(rRow);
+
+        const sRow = document.createElement("div");
+        sRow.className = "spRow" + (sym.code === selectedCode ? " active" : "");
+        const mTag = getMarketShortTag(sym.market);
+        sRow.innerHTML = `
+          <div class="spAsset">
+            <div class="spIcon" style="background:${circosColor}">${sym.code.slice(0, 2)}</div>
+            <div class="spOpenDot ${sym.isOpen ? "open" : "closed"}">${sym.isOpen ? "✓" : "·"}</div>
+            <div class="spAssetTxt"><div class="spCode">${sym.code}</div><div class="spSubName">${sym.name}</div></div>
+          </div>
+          <div class="spSpiderLane"></div>
+          <div class="spPrice">—</div>
+          <div class="spChg">0.00%</div>
+          <div class="spSparkBox"><div class="spTrendLbl" style="color:#94a3b8">EMA200 —</div><div class="spSparkSlot"></div></div>
+          <div class="spAskBid"><div class="spAbTxt">A:— / B:—</div><div class="spMiniBars spBarsAB"></div></div>
+          <div class="spRateCol"><span class="rateBadge"><span class="rGrade">B</span> <span class="rScore">65.0</span></span><span class="mktBadge">${mTag}</span><span class="spVolTxt">${sym.ticks}t</span></div>
+          <div class="spShare"><div class="spShareVal">0.0%</div><div class="spShareSub">share</div></div>`;
+        sRow.onclick = () => selectSymbol(sym.code);
+        spiderRowRefs.set(sym.code, {
+          row: sRow, laneEl: sRow.querySelector(".spSpiderLane"), priceEl: sRow.querySelector(".spPrice"), chgEl: sRow.querySelector(".spChg"),
+          trendEl: sRow.querySelector(".spTrendLbl"), sparkSlot: sRow.querySelector(".spSparkSlot"), abTxt: sRow.querySelector(".spAbTxt"),
+          barsAB: sRow.querySelector(".spBarsAB"), rGrade: sRow.querySelector(".rGrade"), rScore: sRow.querySelector(".rScore"),
+          volTxt: sRow.querySelector(".spVolTxt"), shareEl: sRow.querySelector(".spShareVal")
+        });
+        spiderFrag.appendChild(sRow);
+
+        const angle = (idx / Math.max(total, 1)) * Math.PI * 2 - Math.PI * 0.5, arcSpan = (Math.PI * 2) / Math.max(total, 1);
+        const node = { code: sym.code, name: sym.name, market: sym.market, submarket: sym.submarket, groupKey: gKey, meta: getGroupMeta(gKey), hue, circosColor, angle, arcSpan, baseWeight: weight, tileRect: { x: 0, y: 0, w: 20, h: 20 }, ringPoint: { x: 0, y: 0 }, catalogRef: sym };
+        nodes.set(sym.code, node);
+        if (!clusters.has(gKey)) clusters.set(gKey, { key: gKey, meta: getGroupMeta(gKey), nodes: [], treemapRect: { x: 0, y: 0, w: 0, h: 0 } });
+        clusters.get(gKey).nodes.push(node);
+        updateRowDOM(sym);
+      });
+
+      pipeScroll.appendChild(pipeFrag); predScroll.appendChild(predFrag); spiderScroll.appendChild(spiderFrag);
+
+      for (let i = 0; i < filtered.length; i++) {
+        const a = filtered[i], b1 = filtered[(i + Math.max(3, Math.floor(filtered.length * 0.37))) % filtered.length], b2 = filtered[(i + Math.max(5, Math.floor(filtered.length * 0.61))) % filtered.length];
+        if (b1 && b1.code !== a.code) circosChords.push({ aCode: a.code, bCode: b1.code, hueA: a.circosHue, hueB: b1.circosHue });
+        if (i % 2 === 0 && b2 && b2.code !== a.code) circosChords.push({ aCode: a.code, bCode: b2.code, hueA: a.circosHue, hueB: b2.circosHue });
+      }
+
+      if (!selectedCode || !nodes.has(selectedCode)) selectedCode = nodes.has("1HZ100V") ? "1HZ100V" : nodes.has("R_100") ? "R_100" : filtered[0].code;
+      selectSymbol(selectedCode); refreshPredictionSummary(); layoutTreemap();
+    }
+
+    function fmtNum(val, pip) {
+      if (val === null || val === undefined || Number.isNaN(val)) return "—";
+      return Number(val).toFixed(Math.min(Math.max(pip ?? 2, 1), 5));
+    }
+
+    function updateRowDOM(sym) {
+      const pRef = pipeRowRefs.get(sym.code);
+      if (pRef) {
+        pRef.vTicks.textContent = `${sym.ticks}t`; pRef.vAsk.textContent = fmtNum(sym.ask ?? sym.quote, sym.pipSize); pRef.vBid.textContent = fmtNum(sym.bid ?? sym.quote, sym.pipSize);
+        const rsiState = getRsiState(sym.rsi); pRef.vRsi.textContent = sym.rsi !== null ? sym.rsi.toFixed(1) : "—"; pRef.vRsi.style.color = rsiState.color;
+        pRef.vRsiSt.textContent = rsiState.label.slice(0, 6); pRef.vRsiSt.style.color = rsiState.color;
+        pRef.vE200.textContent = fmtNum(sym.ema200, sym.pipSize); pRef.vE150.textContent = fmtNum(sym.ema150, sym.pipSize);
+        if (sym.ema150 !== null && sym.ema200 !== null) { const bull = sym.ema150 >= sym.ema200; pRef.vEmaSt.textContent = bull ? "▲BUL" : "▼BER"; pRef.vEmaSt.style.color = bull ? "#34d399" : "#f87171"; }
+        const atrState = getAtrState(sym); pRef.vAtr.textContent = sym.atr !== null ? sym.atr.toFixed(Math.min((sym.pipSize ?? 2) + 1, 5)) : "—";
+        pRef.vAtrSt.textContent = atrState.label.slice(0, 5); pRef.vAtrSt.style.color = atrState.color;
+        const mod5 = sym.ticks % 5; pRef.vBlinkCnt.textContent = sym.ticks > 0 && mod5 === 0 ? "5/5!" : `${mod5}/5`;
+      }
+      const rRef = predRowRefs.get(sym.code);
+      if (rRef) { const pred = getOverallPrediction(sym); sym.predKey = pred.key; rRef.signalEl.textContent = pred.label; rRef.signalEl.style.background = pred.bg; rRef.signalEl.style.color = pred.color; rRef.confEl.textContent = pred.conf; }
+      const sRef = spiderRowRefs.get(sym.code);
+      if (sRef) {
+        sRef.priceEl.textContent = sym.quote !== null ? fmtNum(sym.quote, sym.pipSize) : "—";
+        const up = sym.pct >= 0; sRef.chgEl.textContent = `${up ? "▲ +" : "▼ "}${sym.pct.toFixed(2)}%`; sRef.chgEl.className = `spChg ${up ? "up" : "down"}`;
+        const ema200Bull = sym.quote !== null && sym.ema200 !== null ? sym.quote >= sym.ema200 : up;
+        sRef.trendEl.textContent = sym.ema200 !== null ? (ema200Bull ? "▲ EMA200 BULL" : "▼ EMA200 BEAR") : "EMA200 WAIT";
+        sRef.trendEl.style.color = sym.ema200 !== null ? (ema200Bull ? "#34d399" : "#f87171") : "#94a3b8";
+        sRef.sparkSlot.innerHTML = buildSparklineSVG(sym.spark, ema200Bull);
+        sRef.abTxt.textContent = `A:${fmtNum(sym.ask ?? sym.quote, sym.pipSize)} B:${fmtNum(sym.bid ?? sym.quote, sym.pipSize)}`;
+        sRef.barsAB.innerHTML = buildMiniBarsHTML(sym.recentDeltas);
+        const rating = getRating(sym); sRef.rGrade.textContent = rating.grade; sRef.rScore.textContent = rating.score; sRef.volTxt.textContent = `${sym.ticks}t`;
+        sRef.shareEl.textContent = `${totalNetworkTicks > 0 ? ((sym.ticks / totalNetworkTicks) * 100).toFixed(2) : "0.00"}%`;
+      }
+    }
+
+    function refreshPredictionSummary() {
+      let ob = 0, os = 0, bull = 0, bear = 0;
+      for (const s of filteredSymbolsList) { if (s.predKey === "OB") ob++; else if (s.predKey === "OS") os++; else if (s.predKey === "BULL") bull++; else if (s.predKey === "BEAR") bear++; }
+      predSummaryEl.innerHTML = `<span class="sumChip" style="color:#f472b6">OB:${ob}</span><span class="sumChip" style="color:#34d399">OS:${os}</span><span class="sumChip" style="color:#38bdf8">BULL:${bull}</span><span class="sumChip" style="color:#fb923c">BEAR:${bear}</span>`;
+    }
+
+    pipeScroll.addEventListener("scroll", () => {
+      if (!syncingScroll) { syncingScroll = true; predScroll.scrollTop = pipeScroll.scrollTop; requestAnimationFrame(() => (syncingScroll = false)); }
+      const box = pipeScroll.getBoundingClientRect();
+      for (const [code, ref] of pipeRowRefs.entries()) { const r = ref.row.getBoundingClientRect(); if (r.bottom >= box.top && r.top <= box.bottom) enqueueHistory(code); }
+    });
+    predScroll.addEventListener("scroll", () => { if (!syncingScroll) { syncingScroll = true; pipeScroll.scrollTop = predScroll.scrollTop; requestAnimationFrame(() => (syncingScroll = false)); } });
+    spiderScroll.addEventListener("scroll", () => {
+      const cur = spiderScroll.scrollTop; spiderScrollVel = Math.max(-45, Math.min(45, cur - lastSpiderScrollTop)); lastSpiderScrollTop = cur;
+      const box = spiderScroll.getBoundingClientRect();
+      for (const [code, ref] of spiderRowRefs.entries()) { const r = ref.row.getBoundingClientRect(); if (r.bottom >= box.top && r.top <= box.bottom) enqueueHistory(code); }
+    });
+
+    // =========================================================================
+    // 5. MULTI-SHOT AUTO TRADER + STRICT REAL / DEMO / AUTO ACCOUNT ROUTING
+    // =========================================================================
+    const MS_MARKETS = [
+      { code: "1HZ10V",  name: "Vol 10 (1s)",  pip: 2 },
+      { code: "1HZ15V",  name: "Vol 15 (1s)",  pip: 2 },
+      { code: "1HZ25V",  name: "Vol 25 (1s)",  pip: 2 },
+      { code: "1HZ30V",  name: "Vol 30 (1s)",  pip: 2 },
+      { code: "1HZ50V",  name: "Vol 50 (1s)",  pip: 2 },
+      { code: "1HZ75V",  name: "Vol 75 (1s)",  pip: 2 },
+      { code: "1HZ90V",  name: "Vol 90 (1s)",  pip: 2 },
+      { code: "1HZ100V", name: "Vol 100 (1s)", pip: 2 },
+      { code: "JD10",    name: "Jump 10",      pip: 2 },
+      { code: "JD50",    name: "Jump 50",      pip: 2 }
+    ];
+
+    const msState = {
+      accountMode: "auto",
+      hasTokenSession: false,
+      tradeType: "DIGITS",
+      direction: "OVER",
+      mode: "SAFE",
+      baseStake: 2.0,
+      recovery: false,
+      zigZag: true,
+      autoFire: false,
+      firingBasket: false,
+      basketCount: 0,
+      paperBalance: 1000.0,
+      liveBalance: null,
+      currency: "USD",
+      accountId: "PAPER DEMO",
+      accountType: "paper",
+      sessionPL: 0,
+      history: [],
+      tradeWs: null,
+      authorized: false,
+      authMethod: null,
+      token: null,
+      appId: DEFAULT_DERIV_APP_ID,
+      accounts: [],
+      blockedReason: null,
+      markets: new Map()
+    };
+
+    const msGridEl = document.getElementById("msGrid");
+    const atHistBody = document.getElementById("atHistBody");
+    const loginModal = document.getElementById("loginModal");
+    const loginStatusMsg = document.getElementById("loginStatusMsg");
+    const acctSwitchWrap = document.getElementById("acctSwitchWrap");
+    const loginAcctSelect = document.getElementById("loginAcctSelect");
+    const loggedInActions = document.getElementById("loggedInActions");
+    const atQuickAcctSelect = document.getElementById("atQuickAcctSelect");
+
+    function setLoginStatus(msg, isError = false) {
+      loginStatusMsg.textContent = msg;
+      loginStatusMsg.style.borderColor = isError ? "#f87171" : "#34d399";
+      loginStatusMsg.style.color = isError ? "#fca5a5" : "#6ee7b7";
+      loginStatusMsg.classList.add("show");
+    }
+
+    function syncAccountModeUI() {
+      document.querySelectorAll("[data-acmode]").forEach((btn) => {
+        const m = btn.dataset.acmode;
+        btn.classList.remove("selReal", "selDemo", "selAuto");
+        if (m === msState.accountMode) btn.classList.add(m === "real" ? "selReal" : m === "demo" ? "selDemo" : "selAuto");
+      });
+    }
+
+    function saveSettingsLocally() {
+      try {
+        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({
+          tradeType: msState.tradeType, direction: msState.direction, mode: msState.mode,
+          baseStake: msState.baseStake, recovery: msState.recovery, zigZag: msState.zigZag,
+          tp: document.getElementById("atTpInput").value, sl: document.getElementById("atSlInput").value, maxBaskets: document.getElementById("atMaxBaskets").value
+        }));
+      } catch (_) {}
+    }
+
+    function loadSettingsLocally() {
+      try {
+        const raw = localStorage.getItem(SETTINGS_STORAGE_KEY); if (!raw) return;
+        const s = JSON.parse(raw);
+        if (s.tradeType) msState.tradeType = s.tradeType;
+        if (s.direction) msState.direction = s.direction;
+        if (s.mode) msState.mode = s.mode;
+        if (s.baseStake > 0) { msState.baseStake = Number(s.baseStake); document.getElementById("atStakeInput").value = msState.baseStake.toFixed(2); }
+        msState.recovery = Boolean(s.recovery); document.getElementById("atRecoveryChk").checked = msState.recovery;
+        if (typeof s.zigZag === "boolean") { msState.zigZag = s.zigZag; document.getElementById("atZigZagChk").checked = msState.zigZag; }
+        if (s.tp) document.getElementById("atTpInput").value = s.tp;
+        if (s.sl) document.getElementById("atSlInput").value = s.sl;
+        if (s.maxBaskets) document.getElementById("atMaxBaskets").value = s.maxBaskets;
+      } catch (_) {}
+    }
+
+    function saveSessionLocally(expiresInSec) {
+      if (!document.getElementById("loginRememberChk").checked) return;
+      try {
+        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
+          authMethod: msState.authMethod, token: msState.token, appId: msState.appId,
+          accountId: msState.accountId, accountMode: msState.accountMode,
+          expiresAt: expiresInSec ? Date.now() + expiresInSec * 1000 : null, savedAt: Date.now()
+        }));
+      } catch (_) {}
+    }
+
+    function buildAuthHeaders(token, authMethod, appId) {
+      const h = { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" };
+      if (authMethod === "pat") h["Deriv-App-ID"] = appId || DEFAULT_DERIV_APP_ID;
+      return h;
+    }
+
+    function normalizeAccount(a) {
+      const id = a.account_id || a.id || a.loginid || String(a);
+      const rawType = (a.account_type || a.type || "").toLowerCase();
+      const isDemo = rawType === "demo" || Boolean(a.is_demo) || /^DOT|^VRT|^VRTC/i.test(id);
+      return { id, type: isDemo ? "demo" : "real", currency: a.currency || "USD", balance: a.balance !== undefined ? Number(a.balance) : null };
+    }
+
+    function resolveAccountForMode(preferredAccountId) {
+      const all = msState.accounts;
+      if (msState.accountMode === "real") {
+        const reals = all.filter((a) => a.type === "real");
+        return { eligible: reals, chosen: reals.find((a) => a.id === preferredAccountId) || reals[0] || null, missingMsg: "NO REAL ACCOUNT ON TOKEN" };
+      }
+      if (msState.accountMode === "demo") {
+        const demos = all.filter((a) => a.type === "demo");
+        return { eligible: demos, chosen: demos.find((a) => a.id === preferredAccountId) || demos[0] || null, missingMsg: "NO DEMO ACCOUNT ON TOKEN" };
+      }
+      const fundedDemo = all.find((a) => a.type === "demo" && (a.balance === null || a.balance >= msState.baseStake));
+      const anyDemo = all.find((a) => a.type === "demo");
+      const fundedReal = all.find((a) => a.type === "real" && (a.balance === null || a.balance >= msState.baseStake));
+      const chosen = all.find((a) => a.id === preferredAccountId) || fundedDemo || fundedReal || anyDemo || all[0] || null;
+      return { eligible: all, chosen, missingMsg: "NO ELIGIBLE ACCOUNT ON TOKEN" };
+    }
+
+    async function applyAccountModeRouting(preferredAccountId) {
+      syncAccountModeUI();
+      if (!msState.hasTokenSession) {
+        if (msState.accountMode === "real" || msState.accountMode === "demo") {
+          msState.blockedReason = `LOGIN WITH TOKEN FOR ${msState.accountMode.toUpperCase()}`;
+          msState.autoFire = false; updateAutoFireBtn();
+          setLoginStatus(`Please connect your Deriv Token to trade ${msState.accountMode.toUpperCase()} accounts.`, true);
+        } else {
+          msState.blockedReason = null;
+        }
+        renderMultiShotSummary();
+        return;
+      }
+
+      const { eligible, chosen, missingMsg } = resolveAccountForMode(preferredAccountId);
+      populateAccountSelectors(eligible, chosen?.id || "");
+      if (!chosen) {
+        if (msState.tradeWs) { try { msState.tradeWs.close(); } catch (_) {} msState.tradeWs = null; }
+        msState.authorized = false; msState.accountId = missingMsg; msState.accountType = msState.accountMode;
+        msState.liveBalance = null; msState.blockedReason = missingMsg; msState.autoFire = false; updateAutoFireBtn();
+        setLoginStatus(`${missingMsg}. Trading is strictly locked.`, true);
+        renderMultiShotSummary();
+        return;
+      }
+
+      msState.blockedReason = null;
+      await connectAccountOTP(chosen);
+      if (msState.accountMode === "auto") {
+        msState.markets.forEach((m) => (m.enabled = true));
+        msState.autoFire = true; updateAutoFireBtn();
+        setLoginStatus(`AUTO MODE → Connected ${chosen.id} (${chosen.type.toUpperCase()}) · Auto-Selected Trading ACTIVE.`);
+      } else {
+        setLoginStatus(`${msState.accountMode.toUpperCase()} ONLY → Connected ${chosen.id} (${chosen.type.toUpperCase()}).`);
+      }
+      saveSessionLocally();
+      renderMultiShotSummary();
+    }
+
+    async function loginWithDerivToken({ token, authMethod, appId, preferredAccountId, expiresInSec }) {
+      setLoginStatus("Verifying Deriv token & loading Options accounts...");
+      try {
+        const res = await fetch("https://api.derivws.com/trading/v1/options/accounts", { method: "GET", headers: buildAuthHeaders(token, authMethod, appId) });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.errors?.[0]?.message || json?.message || `HTTP ${res.status}`);
+        const rawList = Array.isArray(json.data) ? json.data : (json.data?.accounts || json.accounts || []);
+        if (!rawList.length) throw new Error("No Deriv Options accounts found on this token.");
+
+        msState.accounts = rawList.map(normalizeAccount); msState.token = token; msState.authMethod = authMethod;
+        msState.appId = appId || DEFAULT_DERIV_APP_ID; msState.hasTokenSession = true;
+        document.getElementById("atBtnReset").style.display = "none";
+        loggedInActions.style.display = "flex";
+        await applyAccountModeRouting(preferredAccountId);
+        saveSessionLocally(expiresInSec);
+      } catch (err) { setLoginStatus(`Login error: ${err.message}`, true); }
+    }
+
+    function populateAccountSelectors(accounts, selectedId) {
+      if (!accounts.length) {
+        loginAcctSelect.innerHTML = `<option value="">No ${msState.accountMode.toUpperCase()} account found</option>`;
+        atQuickAcctSelect.innerHTML = `<option value="">No ${msState.accountMode.toUpperCase()} acct</option>`;
+        acctSwitchWrap.style.display = "flex"; atQuickAcctSelect.style.display = "inline-block";
+        return;
+      }
+      const opts = accounts.map((a) => `<option value="${a.id}">${a.id} · ${a.type.toUpperCase()} (${a.currency}${a.balance !== null ? " $" + a.balance.toFixed(2) : ""})</option>`).join("");
+      loginAcctSelect.innerHTML = opts; loginAcctSelect.value = selectedId;
+      atQuickAcctSelect.innerHTML = opts; atQuickAcctSelect.value = selectedId;
+      acctSwitchWrap.style.display = "flex"; atQuickAcctSelect.style.display = "inline-block";
+    }
+
+    async function connectAccountOTP(acct) {
+      if (msState.tradeWs) { try { msState.tradeWs.close(); } catch (_) {} msState.tradeWs = null; }
+      msState.accountId = acct.id; msState.accountType = acct.type; msState.currency = acct.currency || "USD"; msState.liveBalance = acct.balance;
+      const otpRes = await fetch(`https://api.derivws.com/trading/v1/options/accounts/${encodeURIComponent(acct.id)}/otp`, { method: "POST", headers: buildAuthHeaders(msState.token, msState.authMethod, msState.appId) });
+      const otpJson = await otpRes.json();
+      if (!otpRes.ok) throw new Error(otpJson?.errors?.[0]?.message || `OTP HTTP ${otpRes.status}`);
+      const wsUrl = otpJson?.data?.url || otpJson?.url;
+      if (!wsUrl) throw new Error("OTP endpoint did not return WebSocket URL.");
+      await openAuthenticatedTradingWS(wsUrl);
+    }
+
+    const pendingProposalReqs = new Map();
+    let tradeReqId = 9000;
+
+    function openAuthenticatedTradingWS(wsUrl) {
+      return new Promise((resolve, reject) => {
+        const tws = new WebSocket(wsUrl);
+        msState.tradeWs = tws;
+        let settled = false;
+
+        tws.onopen = () => {
+          msState.authorized = true; settled = true;
+          document.getElementById("btnLoginModal").classList.add("loggedIn"); document.getElementById("btnLoginModal").textContent = `✓ ${msState.accountId}`;
+          document.getElementById("atOpenLoginBtn").classList.add("loggedIn"); document.getElementById("atOpenLoginBtn").textContent = `✓ ${msState.accountId} (${msState.accountType.toUpperCase()})`;
+          document.getElementById("btnResetDemo").style.display = msState.accountType === "demo" ? "inline-block" : "none";
+          tws.send(JSON.stringify({ balance: 1, subscribe: 1, req_id: ++tradeReqId }));
+          renderMultiShotSummary(); resolve();
+        };
+        tws.onerror = () => { if (!settled) reject(new Error("Authenticated WebSocket connection failed.")); };
+        tws.onmessage = (ev) => {
+          const d = JSON.parse(ev.data);
+          if (d.error) {
+            if (pendingProposalReqs.has(d.req_id)) {
+              const p = pendingProposalReqs.get(d.req_id); pendingProposalReqs.delete(d.req_id);
+              const m = msState.markets.get(p.code);
+              if (m) { m.statusTxt = d.error.message.slice(0, 14); m.pending = null; }
+              if (![...msState.markets.values()].some((x) => x.pending !== null)) msState.firingBasket = false;
+              renderMultiShotSummary();
+            }
+            return;
+          }
+          if (d.msg_type === "balance" && d.balance) { msState.liveBalance = Number(d.balance.balance); renderMultiShotSummary(); }
+          if (d.msg_type === "proposal" && d.proposal && pendingProposalReqs.has(d.req_id)) {
+            const p = pendingProposalReqs.get(d.req_id); pendingProposalReqs.delete(d.req_id);
+            const m = msState.markets.get(p.code); if (m) m.statusTxt = "BUYING...";
+            tws.send(JSON.stringify({ buy: d.proposal.id, price: p.stake, subscribe: 1, passthrough: { ms_code: p.code, basket_id: p.basketId, label: p.label, stake: p.stake } }));
+          }
+          if (d.msg_type === "buy" && d.buy && d.echo_req?.passthrough?.ms_code) {
+            const pt = d.echo_req.passthrough, m = msState.markets.get(pt.ms_code);
+            if (m) m.statusTxt = "OPEN...";
+            tws.send(JSON.stringify({ proposal_open_contract: 1, contract_id: d.buy.contract_id, subscribe: 1, passthrough: pt }));
+          }
+          if (d.msg_type === "proposal_open_contract" && d.proposal_open_contract?.is_sold) {
+            const poc = d.proposal_open_contract, code = poc.underlying_symbol || poc.underlying || d.echo_req?.passthrough?.ms_code, m = msState.markets.get(code);
+            if (m && m.pending) { const p = m.pending; m.pending = null; settleMarketResult(m, p, Number(poc.profit) >= 0, Number(poc.profit)); }
+            if (poc.id) tws.send(JSON.stringify({ forget: poc.id }));
+          }
+        };
+        tws.onclose = () => { msState.authorized = false; renderMultiShotSummary(); };
+      });
+    }
+
+    function base64UrlEncode(buf) {
+      return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    }
+
+    async function startOAuth2PKCE() {
+      if (window.location.protocol === "file:") { setLoginStatus("OAuth 2.0 requires http://localhost or HTTPS registered on developers.deriv.com. Paste a PAT token above for file://!", true); return; }
+      const appId = document.getElementById("loginAppId").value.trim() || DEFAULT_DERIV_APP_ID, redirectUri = `${window.location.origin}${window.location.pathname}`;
+      const codeVerifier = base64UrlEncode(crypto.getRandomValues(new Uint8Array(48))), digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(codeVerifier));
+      const codeChallenge = base64UrlEncode(digest), oauthState = base64UrlEncode(crypto.getRandomValues(new Uint8Array(16)));
+      sessionStorage.setItem(PKCE_STORAGE_KEY, JSON.stringify({ codeVerifier, oauthState, appId, redirectUri }));
+      const authUrl = new URL("https://auth.deriv.com/oauth2/auth");
+      authUrl.searchParams.set("response_type", "code"); authUrl.searchParams.set("client_id", appId); authUrl.searchParams.set("redirect_uri", redirectUri);
+      authUrl.searchParams.set("scope", "trade"); authUrl.searchParams.set("code_challenge", codeChallenge); authUrl.searchParams.set("code_challenge_method", "S256"); authUrl.searchParams.set("state", oauthState);
+      window.location.href = authUrl.toString();
+    }
+
+    async function handleOAuthCallbackOrRestoreSession() {
+      const params = new URLSearchParams(window.location.search), authCode = params.get("code"), retState = params.get("state");
+      if (authCode && retState) {
+        loginModal.classList.add("open");
+        try {
+          const savedPkce = JSON.parse(sessionStorage.getItem(PKCE_STORAGE_KEY) || "null"); sessionStorage.removeItem(PKCE_STORAGE_KEY);
+          if (!savedPkce || savedPkce.oauthState !== retState) throw new Error("OAuth state mismatch.");
+          const body = new URLSearchParams({ grant_type: "authorization_code", client_id: savedPkce.appId, code: authCode, code_verifier: savedPkce.codeVerifier, redirect_uri: savedPkce.redirectUri });
+          const tokRes = await fetch("https://auth.deriv.com/oauth2/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
+          const tokJson = await tokRes.json();
+          if (!tokRes.ok || !tokJson.access_token) throw new Error(tokJson.error_description || "Token exchange failed.");
+          window.history.replaceState({}, document.title, window.location.pathname);
+          await loginWithDerivToken({ token: tokJson.access_token, authMethod: "oauth", appId: savedPkce.appId, expiresInSec: tokJson.expires_in });
+        } catch (err) { setLoginStatus(`OAuth callback error: ${err.message}`, true); }
+        return;
+      }
+      try {
+        const raw = localStorage.getItem(SESSION_STORAGE_KEY); if (!raw) return;
+        const sess = JSON.parse(raw);
+        if (sess.accountMode) msState.accountMode = sess.accountMode;
+        syncAccountModeUI();
+        if (sess.expiresAt && Date.now() >= sess.expiresAt) { localStorage.removeItem(SESSION_STORAGE_KEY); return; }
+        if (sess.token) {
+          document.getElementById("loginAppId").value = sess.appId || DEFAULT_DERIV_APP_ID;
+          await loginWithDerivToken({ token: sess.token, authMethod: sess.authMethod || "pat", appId: sess.appId || DEFAULT_DERIV_APP_ID, preferredAccountId: sess.accountId });
+        }
+      } catch (_) {}
+    }
+
+    function logoutAndForgetDevice() {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      if (msState.tradeWs) { try { msState.tradeWs.close(); } catch (_) {} msState.tradeWs = null; }
+      msState.hasTokenSession = false; msState.authorized = false; msState.token = null; msState.authMethod = null;
+      msState.accounts = []; msState.liveBalance = null; msState.accountId = "PAPER DEMO"; msState.accountType = "paper";
+      msState.blockedReason = null; msState.autoFire = false; msState.accountMode = "auto";
+      syncAccountModeUI(); updateAutoFireBtn();
+      acctSwitchWrap.style.display = "none"; loggedInActions.style.display = "none"; atQuickAcctSelect.style.display = "none";
+      document.getElementById("atBtnReset").style.display = "inline-block";
+      document.getElementById("btnLoginModal").classList.remove("loggedIn"); document.getElementById("btnLoginModal").textContent = "🔐 Login Deriv";
+      document.getElementById("atOpenLoginBtn").classList.remove("loggedIn"); document.getElementById("atOpenLoginBtn").textContent = "🔐 Login Deriv";
+      document.getElementById("loginPatInput").value = "";
+      setLoginStatus("Logged out & removed saved credentials from this device. Returned to Paper Mode.");
+      renderMultiShotSummary();
+    }
+
+    document.querySelectorAll("[data-acmode]").forEach((btn) => {
+      btn.onclick = async () => {
+        msState.accountMode = btn.dataset.acmode;
+        if (msState.accountMode !== "auto") { msState.autoFire = false; updateAutoFireBtn(); }
+        await applyAccountModeRouting();
+      };
+    });
+
+    document.getElementById("btnLoginModal").onclick = () => { closeMobileMenu(); loginModal.classList.add("open"); };
+    document.getElementById("atOpenLoginBtn").onclick = () => loginModal.classList.add("open");
+    document.getElementById("btnCloseLogin").onclick = () => loginModal.classList.remove("open");
+
+    // Resources modal handlers
+    const resourcesModal = document.getElementById("resourcesModal");
+    document.getElementById("btnResources").onclick = () => { closeMobileMenu(); resourcesModal.style.display = "flex"; };
+    document.getElementById("btnCloseResources").onclick = () => { resourcesModal.style.display = "none"; };
+    document.getElementById("btnLoginPat").onclick = async () => {
+      const token = document.getElementById("loginPatInput").value.trim(), appId = document.getElementById("loginAppId").value.trim() || DEFAULT_DERIV_APP_ID;
+      if (!token) { setLoginStatus("Please paste your Deriv Personal Access Token (PAT).", true); return; }
+      await loginWithDerivToken({ token, authMethod: "pat", appId });
+    };
+    document.getElementById("btnLoginOAuth").onclick = startOAuth2PKCE;
+    document.getElementById("btnLogoutDevice").onclick = logoutAndForgetDevice;
+    document.getElementById("btnResetDemo").onclick = async () => {
+      if (!msState.token || msState.accountType !== "demo") return;
+      try {
+        const res = await fetch(`https://api.derivws.com/trading/v1/options/accounts/${encodeURIComponent(msState.accountId)}/reset-demo-balance`, { method: "POST", headers: buildAuthHeaders(msState.token, msState.authMethod, msState.appId) });
+        if (res.ok) setLoginStatus("Demo account balance reset to $10,000 USD."); else setLoginStatus("Could not reset demo balance.", true);
+      } catch (e) { setLoginStatus(e.message, true); }
+    };
+
+    async function switchSelectedAccount(newId) {
+      if (!newId) return;
+      const acct = msState.accounts.find((a) => a.id === newId); if (!acct) return;
+      if (msState.accountMode === "real" && acct.type !== "real") { setLoginStatus("REAL ONLY mode rejects Demo accounts.", true); return; }
+      if (msState.accountMode === "demo" && acct.type !== "demo") { setLoginStatus("DEMO ONLY mode rejects Real accounts.", true); return; }
+      loginAcctSelect.value = newId; atQuickAcctSelect.value = newId;
+      try { await connectAccountOTP(acct); saveSessionLocally(); setLoginStatus(`Switched to ${acct.id} (${acct.type.toUpperCase()}).`); }
+      catch (e) { setLoginStatus(`Switch error: ${e.message}`, true); }
+    }
+    loginAcctSelect.onchange = (e) => switchSelectedAccount(e.target.value);
+    atQuickAcctSelect.onchange = (e) => switchSelectedAccount(e.target.value);
+
+    function getDigitBarrierAndPayout() {
+      if (msState.tradeType === "RF") return { barrier: null, payoutPct: 0.95, label: msState.direction };
+      if (msState.direction === "OVER") {
+        if (msState.mode === "SAFE") return { barrier: 0, payoutPct: 0.095, label: "OVER 0" };
+        if (msState.mode === "HIGH") return { barrier: 1, payoutPct: 0.22,  label: "OVER 1" };
+        return { barrier: 4, payoutPct: 0.94, label: "OVER 4" };
+      } else {
+        if (msState.mode === "SAFE") return { barrier: 9, payoutPct: 0.095, label: "UNDER 9" };
+        if (msState.mode === "HIGH") return { barrier: 8, payoutPct: 0.22,  label: "UNDER 8" };
+        return { barrier: 6, payoutPct: 0.62, label: "UNDER 6" };
+      }
+    }
+
+    function isDigitInRedZone(digit, dirOverride) {
+      if (digit === null || digit === undefined) return false;
+      const dir = dirOverride || msState.direction;
+      const barrier = dir === "OVER" ? (msState.mode === "SAFE" ? 0 : msState.mode === "HIGH" ? 1 : 4) : (msState.mode === "SAFE" ? 9 : msState.mode === "HIGH" ? 8 : 6);
+      return dir === "OVER" ? digit <= barrier : digit >= barrier;
+    }
+
+    function initMultiShotCards() {
+      msGridEl.innerHTML = "";
+      MS_MARKETS.forEach((m) => {
+        const entry = { code: m.code, name: m.name, pip: m.pip, enabled: true, quote: null, prevQuote: null, lastDigit: null, cumLoss: 0, stake: msState.baseStake, mult: 1, cycleWon: false, pending: null, statusTxt: "READY", flashClass: "" };
+        msState.markets.set(m.code, entry);
+        const card = document.createElement("div");
+        card.className = "msCard"; card.id = `msCard_${m.code}`;
+        card.innerHTML = `<div class="msTop"><span>${m.name}</span><span class="msMultBadge" id="msMult_${m.code}" style="display:none">×1.0</span></div><div class="msDigitBox"><div class="msDigit" id="msDig_${m.code}">—</div><div class="msQuote" id="msQ_${m.code}">—</div></div><div class="msFoot"><span id="msStk_${m.code}">$2.00</span><span id="msSt_${m.code}">READY</span></div>`;
+        card.onclick = () => { entry.enabled = !entry.enabled; renderMultiShotSummary(); };
+        msGridEl.appendChild(card);
+      });
+      renderMultiShotSummary();
+    }
+
+    function computeNextMarketStake(m) {
+      const { payoutPct } = getDigitBarrierAndPayout();
+      if (!msState.recovery || m.cumLoss <= 0) { m.stake = msState.baseStake; m.mult = 1; return; }
+      const targetProfit = msState.baseStake * payoutPct, needed = (m.cumLoss + targetProfit) / payoutPct;
+      const bal = msState.hasTokenSession ? (msState.liveBalance ?? 0) : msState.paperBalance;
+      m.stake = needed > bal ? msState.baseStake : Math.round(needed * 100) / 100;
+      m.mult = m.stake / msState.baseStake;
+    }
+
+    function renderMultiShotSummary() {
+      const { payoutPct } = getDigitBarrierAndPayout();
+      let enabledCnt = 0, wonCnt = 0, totalCost = 0, redCount = 0;
+      for (const m of msState.markets.values()) {
+        computeNextMarketStake(m);
+        if (m.enabled) { enabledCnt++; if (m.cycleWon && msState.recovery) wonCnt++; else totalCost += m.stake; if (msState.tradeType === "DIGITS" && isDigitInRedZone(m.lastDigit)) redCount++; }
+        const card = document.getElementById(`msCard_${m.code}`), digEl = document.getElementById(`msDig_${m.code}`), qEl = document.getElementById(`msQ_${m.code}`), stkEl = document.getElementById(`msStk_${m.code}`), stEl = document.getElementById(`msSt_${m.code}`), multEl = document.getElementById(`msMult_${m.code}`);
+        if (!card) continue;
+        const isRed = msState.tradeType === "DIGITS" && isDigitInRedZone(m.lastDigit);
+        card.className = "msCard" + (!m.enabled ? " disabled" : "") + (m.enabled && isRed && !m.cycleWon ? " redZone" : "") + (m.cycleWon && msState.recovery ? " cycleDone" : "") + (m.flashClass ? ` ${m.flashClass}` : "");
+        if (msState.tradeType === "DIGITS") { digEl.textContent = m.lastDigit !== null ? m.lastDigit : "—"; digEl.className = "msDigit" + (isRed ? " red" : ""); }
+        else { const isUp = m.quote !== null && m.prevQuote !== null ? m.quote >= m.prevQuote : true; digEl.textContent = m.quote !== null ? (isUp ? "▲" : "▼") : "—"; digEl.className = "msDigit" + (!isUp ? " red" : ""); }
+        qEl.textContent = m.quote !== null ? m.quote.toFixed(m.pip) : "—";
+        stkEl.textContent = m.cycleWon && msState.recovery ? "WON" : `$${m.stake.toFixed(2)}`;
+        stEl.textContent = m.statusTxt;
+        if (m.mult > 1.05 && msState.recovery && !m.cycleWon) { multEl.style.display = "inline-block"; multEl.textContent = `×${m.mult.toFixed(1)}`; }
+        else multEl.style.display = "none";
+      }
+      document.getElementById("atMarketCount").textContent = `${enabledCnt}/10`;
+      document.getElementById("atCycleProg").textContent = `${wonCnt}/${enabledCnt} WON`;
+      document.getElementById("atBasketCost").textContent = `$${totalCost.toFixed(2)} · ${enabledCnt}t`;
+      document.getElementById("atWinPays").textContent = `+$${(msState.baseStake * payoutPct).toFixed(2)}`;
+      document.getElementById("atTriggerBadge").textContent = `Red digits: ${redCount}`;
+
+      const acctEl = document.getElementById("atAccountLabel");
+      if (msState.blockedReason) { acctEl.textContent = msState.blockedReason; acctEl.style.color = "#f87171"; }
+      else if (msState.hasTokenSession) { acctEl.textContent = `${msState.accountId} · ${msState.accountType.toUpperCase()} (${msState.accountMode.toUpperCase()})`; acctEl.style.color = msState.accountType === "real" ? "#f87171" : "#34d399"; }
+      else { acctEl.textContent = "PAPER DEMO (NO TOKEN)"; acctEl.style.color = "#38bdf8"; }
+
+      const bal = msState.hasTokenSession ? (msState.liveBalance ?? 0) : msState.paperBalance;
+      document.getElementById("atBalance").textContent = `$${bal.toFixed(2)}`;
+      const plEl = document.getElementById("atSessionPL");
+      plEl.textContent = `${msState.sessionPL >= 0 ? "+" : ""}$${msState.sessionPL.toFixed(2)}`;
+      plEl.style.color = msState.sessionPL >= 0 ? "#34d399" : "#f87171";
+
+      const fireBtn = document.getElementById("atFireBtn");
+      fireBtn.disabled = Boolean(msState.blockedReason) || (msState.hasTokenSession && !msState.authorized);
+      const allCycleWon = msState.recovery && enabledCnt > 0 && wonCnt === enabledCnt;
+      fireBtn.textContent = msState.blockedReason ? `⛔ ${msState.blockedReason}` : allCycleWon ? "🔄 START NEW CYCLE" : msState.firingBasket ? "⏳ SETTLING..." : "🔥 FIRE BASKET";
+    }
+
+    function fireMultiShotBasket() {
+      if (msState.firingBasket || msState.blockedReason) return;
+      if (msState.hasTokenSession) {
+        if (!msState.authorized || !msState.tradeWs || msState.tradeWs.readyState !== WebSocket.OPEN) { document.getElementById("atBotStatus").textContent = "WAIT AUTH WS"; return; }
+        if (msState.accountMode === "real" && msState.accountType !== "real") { document.getElementById("atBotStatus").textContent = "BLOCKED: REAL ONLY"; return; }
+        if (msState.accountMode === "demo" && msState.accountType !== "demo") { document.getElementById("atBotStatus").textContent = "BLOCKED: DEMO ONLY"; return; }
+      }
+      const activeList = [...msState.markets.values()].filter((m) => m.enabled);
+      if (!activeList.length) return;
+      if (msState.recovery && activeList.every((m) => m.cycleWon)) {
+        activeList.forEach((m) => { m.cycleWon = false; m.cumLoss = 0; m.statusTxt = "READY"; m.flashClass = ""; });
+        renderMultiShotSummary(); return;
+      }
+      const toTrade = activeList.filter((m) => !(msState.recovery && m.cycleWon));
+      if (!toTrade.length) return;
+
+      let totalStake = 0; toTrade.forEach((m) => { computeNextMarketStake(m); totalStake += m.stake; });
+      const bal = msState.hasTokenSession ? (msState.liveBalance ?? 0) : msState.paperBalance;
+      if (totalStake > bal) { document.getElementById("atBotStatus").textContent = "LOW BALANCE"; msState.autoFire = false; updateAutoFireBtn(); return; }
+
+      msState.firingBasket = true; msState.basketCount += 1;
+      const { barrier, payoutPct, label } = getDigitBarrierAndPayout();
+      document.getElementById("atBotStatus").textContent = `FIRING #${msState.basketCount} (${msState.accountType.toUpperCase()})`;
+
+      if (msState.hasTokenSession) {
+        toTrade.forEach((m) => {
+          m.statusTxt = "QUOTING..."; m.flashClass = "firing";
+          m.pending = { basketId: msState.basketCount, stake: m.stake, payoutPct, label, acctLabel: `${msState.accountId} (${msState.accountType.toUpperCase()})` };
+          const contractType = msState.tradeType === "RF" ? (msState.direction === "RISE" ? "CALL" : "PUT") : (msState.direction === "OVER" ? "DIGITOVER" : "DIGITUNDER");
+          const reqId = ++tradeReqId;
+          pendingProposalReqs.set(reqId, { code: m.code, stake: m.stake, basketId: msState.basketCount, label });
+          const req = { proposal: 1, amount: m.stake, basis: "stake", contract_type: contractType, currency: msState.currency || "USD", duration: 1, duration_unit: "t", underlying_symbol: m.code, req_id: reqId };
+          if (msState.tradeType === "DIGITS") req.barrier = String(barrier);
+          msState.tradeWs.send(JSON.stringify(req));
+        });
+      } else {
+        msState.paperBalance -= totalStake;
+        toTrade.forEach((m) => {
+          m.pending = { basketId: msState.basketCount, stake: m.stake, payoutPct, entryQuote: m.quote, tradeType: msState.tradeType, direction: msState.direction, barrier, label, acctLabel: "PAPER" };
+          m.statusTxt = "ARMED"; m.flashClass = "firing";
+        });
+      }
+      renderMultiShotSummary();
+    }
+
+    function onMultiShotTick(code, quote, pipSize) {
+      const m = msState.markets.get(code); if (!m) return;
+      m.pip = pipSize ?? m.pip; m.prevQuote = m.quote; m.quote = quote;
+      m.lastDigit = Number(quote.toFixed(m.pip).slice(-1));
+
+      if (m.pending && !msState.hasTokenSession) {
+        const p = m.pending; m.pending = null;
+        let won = false;
+        if (p.tradeType === "DIGITS") won = p.direction === "OVER" ? m.lastDigit > p.barrier : m.lastDigit < p.barrier;
+        else if (p.entryQuote !== null) won = p.direction === "RISE" ? quote > p.entryQuote : quote < p.entryQuote;
+        const profit = won ? Math.round(p.stake * p.payoutPct * 100) / 100 : -p.stake;
+        if (won) msState.paperBalance += p.stake + profit;
+        settleMarketResult(m, p, won, profit);
+      }
+
+      if (msState.accountMode === "auto" && msState.hasTokenSession && msState.authorized && !msState.firingBasket && msState.autoFire) {
+        const active = [...msState.markets.values()].filter((x) => x.enabled && !(msState.recovery && x.cycleWon));
+        if (msState.tradeType === "DIGITS" && active.length) {
+          const redOver = active.filter((x) => isDigitInRedZone(x.lastDigit, "OVER")).length;
+          const redUnder = active.filter((x) => isDigitInRedZone(x.lastDigit, "UNDER")).length;
+          if (redUnder > redOver && redUnder >= 2 && msState.direction !== "UNDER") { msState.direction = "UNDER"; syncControlButtons(); }
+          else if (redOver >= redUnder && redOver >= 2 && msState.direction !== "OVER") { msState.direction = "OVER"; syncControlButtons(); }
+        }
+      }
+
+      if (msState.autoFire && !msState.firingBasket && !msState.blockedReason && (stage === "AUTOTRADER" || (msState.hasTokenSession && msState.accountMode === "auto"))) {
+        const active = [...msState.markets.values()].filter((x) => x.enabled && !(msState.recovery && x.cycleWon));
+        if (active.length) {
+          if (msState.tradeType === "DIGITS") { if (active.filter((x) => isDigitInRedZone(x.lastDigit)).length >= 2) fireMultiShotBasket(); }
+          else if (active.every((x) => x.quote !== null)) fireMultiShotBasket();
+        }
+      }
+      if (stage === "AUTOTRADER") renderMultiShotSummary();
+    }
+
+    const activeBasketsLedger = new Map();
+    function settleMarketResult(m, p, won, profit) {
+      msState.sessionPL += profit;
+      if (won) { m.cumLoss = 0; if (msState.recovery) m.cycleWon = true; m.statusTxt = `WON +$${profit.toFixed(2)}`; m.flashClass = "wonFlash"; }
+      else { m.cumLoss += p.stake; m.statusTxt = `LOST -$${p.stake.toFixed(2)}`; m.flashClass = "lostFlash"; }
+      setTimeout(() => { m.flashClass = ""; if (stage === "AUTOTRADER") renderMultiShotSummary(); }, 700);
+
+      if (!activeBasketsLedger.has(p.basketId)) activeBasketsLedger.set(p.basketId, { id: p.basketId, acct: p.acctLabel || msState.accountId, label: p.label, wins: 0, losses: 0, staked: 0, pl: 0 });
+      const b = activeBasketsLedger.get(p.basketId);
+      if (won) b.wins += 1; else b.losses += 1;
+      b.staked += p.stake; b.pl += profit;
+
+      if (![...msState.markets.values()].some((x) => x.pending !== null) && msState.firingBasket) {
+        msState.firingBasket = false; finalizeBasket(b);
+      }
+    }
+
+    function finalizeBasket(b) {
+      const nowStr = new Date().toTimeString().slice(0, 8);
+      msState.history.unshift({ id: b.id, time: nowStr, acct: b.acct, contract: b.label, wl: `${b.wins}–${b.losses}`, staked: b.staked, pl: b.pl });
+      if (msState.history.length > 40) msState.history.pop();
+      document.getElementById("atHistCount").textContent = `${msState.history.length} baskets`;
+      const lastEl = document.getElementById("atLastPL");
+      lastEl.textContent = `${b.pl >= 0 ? "+" : ""}$${b.pl.toFixed(2)}`; lastEl.style.color = b.pl >= 0 ? "#34d399" : "#f87171";
+      document.getElementById("atLastWins").textContent = b.wins;
+      document.getElementById("atLastLoss").textContent = b.losses;
+      atHistBody.innerHTML = msState.history.map((h) => `<tr><td>#${h.id}</td><td>${h.time}</td><td style="font-size:10px;color:#93c5fd">${h.acct}</td><td>${h.contract}</td><td>${h.wl}</td><td>$${h.staked.toFixed(2)}</td><td style="font-weight:800;color:${h.pl >= 0 ? "#34d399" : "#f87171"}">${h.pl >= 0 ? "+" : ""}$${h.pl.toFixed(2)}</td></tr>`).join("");
+
+      if (msState.zigZag && msState.tradeType === "DIGITS" && b.pl < 0) { msState.direction = msState.direction === "OVER" ? "UNDER" : "OVER"; msState.mode = "SAFE"; syncControlButtons(); }
+
+      const tp = parseFloat(document.getElementById("atTpInput").value), sl = parseFloat(document.getElementById("atSlInput").value), maxB = parseInt(document.getElementById("atMaxBaskets").value, 10);
+      const activeList = [...msState.markets.values()].filter((m) => m.enabled);
+      const cycleDone = msState.recovery && activeList.length && activeList.every((m) => m.cycleWon);
+
+      if ((tp > 0 && msState.sessionPL >= tp) || (sl > 0 && msState.sessionPL <= -Math.abs(sl)) || (maxB > 0 && msState.basketCount >= maxB) || cycleDone) {
+        msState.autoFire = false; updateAutoFireBtn(); document.getElementById("atBotStatus").textContent = cycleDone ? "CYCLE WON!" : "LIMIT HIT";
+      } else { document.getElementById("atBotStatus").textContent = msState.autoFire ? "WATCHING..." : "IDLE"; }
+      renderMultiShotSummary();
+    }
+
+    function syncControlButtons() {
+      document.getElementById("msTypeDigits").classList.toggle("selected", msState.tradeType === "DIGITS");
+      document.getElementById("msTypeRF").classList.toggle("selected", msState.tradeType === "RF");
+      document.getElementById("msModeWrap").style.display = msState.tradeType === "DIGITS" ? "flex" : "none";
+      const dirGrp = document.getElementById("msDirGroup");
+      dirGrp.innerHTML = msState.tradeType === "DIGITS"
+        ? `<button class="segBtn ${msState.direction === "OVER" ? "selected" : ""}" data-dir="OVER">Over</button><button class="segBtn ${msState.direction === "UNDER" ? "selected" : ""}" data-dir="UNDER">Under</button>`
+        : `<button class="segBtn ${msState.direction === "RISE" ? "selected" : ""}" data-dir="RISE">Rise</button><button class="segBtn ${msState.direction === "FALL" ? "selected" : ""}" data-dir="FALL">Fall</button>`;
+      dirGrp.querySelectorAll("button").forEach((b) => { b.onclick = () => { msState.direction = b.dataset.dir; syncControlButtons(); renderMultiShotSummary(); saveSettingsLocally(); }; });
+      document.querySelectorAll("[data-mode]").forEach((b) => b.classList.toggle("selected", b.dataset.mode === msState.mode));
+    }
+
+    function updateAutoFireBtn() {
+      const btn = document.getElementById("atAutoFireBtn");
+      btn.classList.toggle("autoRunning", msState.autoFire);
+      btn.textContent = msState.autoFire ? "⚡ AUTO-FIRE: ON" : "⚡ AUTO-FIRE: OFF";
+      document.getElementById("atBotStatus").textContent = msState.blockedReason ? "LOCKED" : msState.autoFire ? "WATCHING..." : "IDLE";
+    }
+
+    document.getElementById("msTypeDigits").onclick = () => { msState.tradeType = "DIGITS"; msState.direction = "OVER"; syncControlButtons(); renderMultiShotSummary(); saveSettingsLocally(); };
+    document.getElementById("msTypeRF").onclick = () => { msState.tradeType = "RF"; msState.direction = "RISE"; syncControlButtons(); renderMultiShotSummary(); saveSettingsLocally(); };
+    document.querySelectorAll("[data-mode]").forEach((b) => { b.onclick = () => { msState.mode = b.dataset.mode; syncControlButtons(); renderMultiShotSummary(); saveSettingsLocally(); }; });
+    document.getElementById("atStakeInput").addEventListener("input", (e) => { const v = parseFloat(e.target.value); if (v > 0) { msState.baseStake = v; renderMultiShotSummary(); saveSettingsLocally(); } });
+    document.getElementById("atRecoveryChk").onchange = (e) => { msState.recovery = e.target.checked; renderMultiShotSummary(); saveSettingsLocally(); };
+    document.getElementById("atZigZagChk").onchange = (e) => { msState.zigZag = e.target.checked; saveSettingsLocally(); };
+    ["atTpInput", "atSlInput", "atMaxBaskets"].forEach((id) => document.getElementById(id).addEventListener("input", saveSettingsLocally));
+    document.getElementById("atSelAll").onclick = () => { msState.markets.forEach((m) => (m.enabled = true)); renderMultiShotSummary(); };
+    document.getElementById("atSelNone").onclick = () => { msState.markets.forEach((m) => (m.enabled = false)); renderMultiShotSummary(); };
+    document.getElementById("atFireBtn").onclick = fireMultiShotBasket;
+    document.getElementById("atAutoFireBtn").onclick = () => { if (msState.blockedReason) return; msState.autoFire = !msState.autoFire; updateAutoFireBtn(); };
+    document.getElementById("atBtnReset").onclick = () => {
+      if (msState.hasTokenSession) return;
+      msState.paperBalance = 1000; msState.sessionPL = 0; msState.basketCount = 0; msState.history = [];
+      msState.markets.forEach((m) => { m.cumLoss = 0; m.cycleWon = false; m.pending = null; m.statusTxt = "READY"; m.flashClass = ""; });
+      atHistBody.innerHTML = `<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:16px">Paper session reset.</td></tr>`;
+      renderMultiShotSummary();
+    };
+
+    loadSettingsLocally();
+    initMultiShotCards();
+    syncControlButtons();
+    syncAccountModeUI();
+    handleOAuthCallbackOrRestoreSession();
+
+    // =========================================================================
+    // 6. DIRECTORY DRAWER
+    // =========================================================================
+    function renderSymbolDirectory() {
+      const q = symSearchEl.value.trim().toLowerCase();
+      const filtered = allSymbolsCatalog.filter((s) => {
+        if (marketFilter !== "ALL" && s.market !== marketFilter) return false;
+        if (!q) return true;
+        return s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || s.market.toLowerCase().includes(q);
+      });
+      symSummaryEl.textContent = `Showing ${filtered.length} of ${allSymbolsCatalog.length} total Deriv symbols (${filtered.filter((s) => s.isOpen).length} open)`;
+      const groups = new Map();
+      for (const s of filtered) { const gKey = `${s.market} · ${s.submarket}`; if (!groups.has(gKey)) groups.set(gKey, []); groups.get(gKey).push(s); }
+      const parts = [];
+      for (const [gTitle, items] of groups.entries()) {
+        const mMeta = getGroupMeta(items[0].market);
+        parts.push(`<div class="symGroupTitle" style="color:${mMeta.color}">${gTitle.toUpperCase()} (${items.length})</div>`);
+        for (const s of items) parts.push(`<div class="symItem" data-code="${s.code}"><span class="symCode" style="color:${s.circosColor || mMeta.color}">${s.code}</span><span class="symName" title="${s.name}">${s.name}</span><span class="symQuote" id="dirq_${s.code}">${s.quote !== null ? fmtNum(s.quote, s.pipSize) : "—"}</span><span class="symState ${s.isOpen ? "open" : "closed"}">${s.isOpen ? "OPEN" : "CLSD"}</span></div>`);
+      }
+      symListEl.innerHTML = parts.join("");
+      symListEl.querySelectorAll(".symItem").forEach((el) => { el.onclick = () => { selectSymbol(el.dataset.code); symbolsDrawer.classList.remove("open"); }; });
+    }
+    btnSymbols.onclick = () => { closeMobileMenu(); symbolsDrawer.classList.toggle("open"); if (symbolsDrawer.classList.contains("open")) renderSymbolDirectory(); };
+    document.getElementById("btnCloseDrawer").onclick = () => symbolsDrawer.classList.remove("open");
+    symSearchEl.addEventListener("input", renderSymbolDirectory);
+    marketSelect.addEventListener("change", () => {
+      marketFilter = marketSelect.value; buildAllViews();
+      if (symbolsDrawer.classList.contains("open")) renderSymbolDirectory();
+      closeMobileMenu();
+    });
+
+    // =========================================================================
+    // 7. DERIV PUBLIC MARKET WEBSOCKET
+    // =========================================================================
+    const wsDot = document.getElementById("wsDot"), wsLabel = document.getElementById("wsLabel");
+    let ws = null;
+    const chunkMap = new Map(), historyQueue = [], historyQueuedSet = new Set(), historyReqMap = new Map();
+    let historyReqCounter = 5000;
+
+    function enqueueHistory(code) {
+      const sym = allSymbolsCatalog.find((s) => s.code === code);
+      if (!sym || sym.historyLoaded || historyQueuedSet.has(code)) return;
+      historyQueuedSet.add(code); historyQueue.push(code);
+    }
+    setInterval(() => {
+      if (!ws || ws.readyState !== WebSocket.OPEN || !historyQueue.length) return;
+      const code = historyQueue.shift(), reqId = ++historyReqCounter;
+      historyReqMap.set(reqId, code);
+      ws.send(JSON.stringify({ ticks_history: code, end: "latest", count: 250, style: "ticks", req_id: reqId }));
+    }, 180);
+
+    function connectDeriv() {
+      ws = new WebSocket("wss://api.derivws.com/trading/v1/options/ws/public");
+      ws.onopen = () => { wsDot.classList.add("live"); wsLabel.textContent = "Connected · Loading all Deriv symbols..."; ws.send(JSON.stringify({ active_symbols: "brief", req_id: 1 })); };
+      ws.onmessage = (ev) => {
+        const data = JSON.parse(ev.data);
+        if (data.error) {
+          if (chunkMap.has(data.req_id)) {
+            const failedChunk = chunkMap.get(data.req_id); chunkMap.delete(data.req_id);
+            failedChunk.forEach((code, idx) => setTimeout(() => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ ticks: code, subscribe: 1 })); }, idx * 45));
+          }
+          return;
+        }
+        if (data.msg_type === "active_symbols" && Array.isArray(data.active_symbols)) {
+          allSymbolsCatalog = data.active_symbols.map((s) => ({
+            code: s.underlying_symbol || s.symbol, name: s.underlying_symbol_name || s.display_name || s.underlying_symbol || s.symbol,
+            market: s.market || "other", submarket: s.submarket || "other", pipSize: s.pip_size ?? 2,
+            isOpen: Boolean(s.exchange_is_open) && !s.is_trading_suspended,
+            quote: null, ask: null, bid: null, firstQuote: null, delta: 0, pct: 0, ticks: 0,
+            prices: [], spark: [], recentDeltas: [], ema50: null, ema100: null, ema150: null, ema200: null,
+            avgGain: 0, avgLoss: 0, rsi: null, atr: null, atrBaseline: 0, atrBlink: 0, tickBlink: 0, predKey: "WAIT", historyLoaded: false
+          }));
+          const existingOpts = new Set([...marketSelect.options].map((o) => o.value));
+          [...new Set(allSymbolsCatalog.map((s) => s.market))].forEach((m) => { if (!existingOpts.has(m)) { const opt = document.createElement("option"); opt.value = m; opt.textContent = getGroupMeta(m).name; marketSelect.appendChild(opt); } });
+          const openSymbols = allSymbolsCatalog.filter((s) => s.isOpen);
+          btnSymbols.textContent = `Symbols (${allSymbolsCatalog.length})`;
+          wsLabel.textContent = `${allSymbolsCatalog.length} symbols (${openSymbols.length} open)`;
+          buildAllViews(); renderSymbolDirectory();
+          openSymbols.slice(0, 24).forEach((s) => enqueueHistory(s.code));
+          const codes = openSymbols.map((s) => s.code);
+          for (let i = 0; i < codes.length; i += 20) {
+            const chunk = codes.slice(i, i + 20), reqId = 1000 + i; chunkMap.set(reqId, chunk);
+            setTimeout(() => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ ticks: chunk, subscribe: 1, req_id: reqId })); }, (i / 20) * 120);
+          }
+        }
+        if (data.msg_type === "history" && data.history?.prices) {
+          const code = historyReqMap.get(data.req_id) || data.echo_req?.ticks_history; historyReqMap.delete(data.req_id);
+          const sym = allSymbolsCatalog.find((s) => s.code === code);
+          if (sym) {
+            const nums = data.history.prices.map(Number); initIndicators(sym, nums);
+            if (sym.quote === null && nums.length) sym.quote = nums[nums.length - 1];
+            if (sym.firstQuote === null && nums.length) { sym.firstQuote = nums[0]; sym.pct = ((sym.quote - sym.firstQuote) / sym.firstQuote) * 100; }
+            updateRowDOM(sym); refreshPredictionSummary(); if (code === selectedCode) refreshOfferCards();
+          }
+        }
+        if (data.msg_type === "tick" && data.tick) handleTick(data.tick);
+        if (data.msg_type === "contracts_for" && data.contracts_for?.available) handleContractsFor(data.contracts_for.available);
+        if (data.msg_type === "proposal" && data.proposal) {
+          activeOffer.askPrice = data.proposal.ask_price; activeOffer.payout = data.proposal.payout ?? null;
+          activeOffer.commission = data.proposal.commission ?? null; activeOffer.updates += 1; refreshOfferCards();
+        }
+      };
+      ws.onclose = () => { wsDot.classList.remove("live"); wsLabel.textContent = "Reconnecting..."; setTimeout(connectDeriv, 2500); };
+    }
+
+    function subscribeOfferFor(code) {
+      if (!ws || ws.readyState !== WebSocket.OPEN || !code) return;
+      activeOffer = { contractType: "—", askPrice: null, payout: null, commission: null, multiplier: null, availableTypes: [], updates: 0 };
+      ws.send(JSON.stringify({ forget_all: "proposal" }));
+      ws.send(JSON.stringify({ contracts_for: code, currency: "USD", req_id: 200 }));
+    }
+
+    function handleContractsFor(available) {
+      activeOffer.availableTypes = [...new Set(available.map((c) => c.contract_type))];
+      const chosen = available.find((c) => c.contract_type === "MULTUP") || available.find((c) => c.contract_type === "ACCU") || available.find((c) => c.contract_type === "CALL") || available[0];
+      if (!chosen || !ws || ws.readyState !== WebSocket.OPEN) return;
+      activeOffer.contractType = chosen.contract_type;
+      const req = { proposal: 1, subscribe: 1, amount: 10, basis: "stake", contract_type: chosen.contract_type, currency: "USD", underlying_symbol: selectedCode, req_id: 201 };
+      if (chosen.contract_type.startsWith("MULT")) { const r = chosen.multiplier_range || [100]; const m = r[Math.floor(r.length / 2)] || 100; activeOffer.multiplier = m; req.multiplier = m; }
+      else if (chosen.contract_type === "ACCU") req.growth_rate = chosen.growth_rate_range?.[0] || 0.01;
+      else { req.duration = 5; req.duration_unit = chosen.min_contract_duration?.endsWith("t") ? "t" : "m"; }
+      ws.send(JSON.stringify(req)); refreshOfferCards();
+    }
+
+    function handleTick(tick) {
+      const code = tick.symbol || tick.underlying_symbol, q = Number(tick.quote);
+      const sym = allSymbolsCatalog.find((s) => s.code === code);
+      if (!sym) return;
+      if (sym.firstQuote === null) sym.firstQuote = q;
+      sym.delta = sym.quote !== null ? q - sym.quote : 0; sym.quote = q;
+      const pip = Math.pow(10, -(sym.pipSize ?? 2));
+      sym.ask = tick.ask !== undefined ? Number(tick.ask) : q + pip; sym.bid = tick.bid !== undefined ? Number(tick.bid) : q - pip;
+      sym.pct = ((q - sym.firstQuote) / sym.firstQuote) * 100; sym.ticks += 1; totalNetworkTicks += 1; sym.tickBlink = 1.0;
+
+      updateIndicatorsOnTick(sym, q);
+      onMultiShotTick(code, q, sym.pipSize);
+
+      if (sym.ticks % 5 === 0) {
+        sym.atrBlink = 1.0;
+        const pRef = pipeRowRefs.get(code);
+        if (pRef) { pRef.vAtrCell.classList.add("atrBlink"); setTimeout(() => pRef.vAtrCell.classList.remove("atrBlink"), 420); }
+      }
+      const rRef = predRowRefs.get(code);
+      if (rRef) { rRef.row.classList.add("tickFlash"); setTimeout(() => rRef.row.classList.remove("tickFlash"), 260); }
+      updateRowDOM(sym); refreshPredictionSummary();
+      const dirEl = document.getElementById(`dirq_${code}`);
+      if (dirEl) dirEl.textContent = fmtNum(q, sym.pipSize);
+      if (code === selectedCode) refreshOfferCards();
+    }
+
+    connectDeriv();
+    setInterval(() => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ ping: 1 })); }, 25000);
+
+    // =========================================================================
+    // 8. SPIDER TAGGED READ & STAGE CONTROLS
+    // =========================================================================
+    const taggedGridEl = document.getElementById("taggedGrid");
+
+    function refreshOfferCards() {
+      const sym = allSymbolsCatalog.find((s) => s.code === selectedCode);
+      if (!sym) return;
+      const color = sym.circosColor || getGroupMeta(sym.market).color, groupName = getGroupMeta(sym.market).name, mTag = getMarketShortTag(sym.market);
+      const pred = getOverallPrediction(sym), rsiSt = getRsiState(sym.rsi), atrSt = getAtrState(sym), emaSig = getEmaSignal(sym);
+
+      document.getElementById("spTicker").textContent = `${sym.code} [${mTag}]`;
+      document.getElementById("spTicker").style.color = color;
+      document.getElementById("spName").textContent = `${sym.name} · ${groupName}`;
+      document.getElementById("spMktCode").textContent = mTag;
+      document.getElementById("spContract").textContent = activeOffer.contractType;
+      document.getElementById("spTicks").textContent = sym.ticks;
+      document.getElementById("taggedSymHeader").textContent = `${sym.code} (${sym.isOpen ? "OPEN" : "CLOSED"})`;
+
+      const askStr = fmtNum(sym.ask ?? sym.quote, sym.pipSize), bidStr = fmtNum(sym.bid ?? sym.quote, sym.pipSize);
+      const offerAskStr = activeOffer.askPrice !== null ? `$${Number(activeOffer.askPrice).toFixed(2)}` : "$10.00";
+      const payStr = activeOffer.payout !== null ? `$${Number(activeOffer.payout).toFixed(2)}` : (activeOffer.multiplier ? `${activeOffer.multiplier}x` : "—");
+
+      const taggedCards = [
+        { label: "STATE & TREND", tag: sym.isOpen ? "OPEN" : "CLOSED", val: `${sym.quote >= (sym.ema200 ?? sym.quote) ? "▲ BULLISH" : "▼ BEARISH"}`, valCol: sym.quote >= (sym.ema200 ?? sym.quote) ? "#34d399" : "#f87171", sub: `Daily ${sym.pct >= 0 ? "+" : ""}${sym.pct.toFixed(2)}% · Mkt [${mTag}]` },
+        { label: "ATR BASED SIGNAL", tag: "ATR(14)", val: `${atrSt.label} (${sym.atr !== null ? sym.atr.toFixed(4) : "—"})`, valCol: atrSt.color, sub: `5T Blink: ${sym.ticks % 5}/5` },
+        { label: "RSI BASED SIGNAL", tag: "RSI(14)", val: `${rsiSt.label} (${sym.rsi !== null ? sym.rsi.toFixed(1) : "—"})`, valCol: rsiSt.color, sub: sym.rsi >= 70 ? "Overbought zone" : sym.rsi <= 30 ? "Oversold zone" : "Momentum active" },
+        { label: "EMA 200 / 100 / 50", tag: emaSig.label, val: `${fmtNum(sym.ema50, sym.pipSize)} / ${fmtNum(sym.ema100, sym.pipSize)}`, valCol: emaSig.color, sub: `EMA200: ${fmtNum(sym.ema200, sym.pipSize)} (${emaSig.dir})` },
+        { label: "TICK VOL & ASK / BID", tag: `${sym.ticks} TICKS`, val: `A:${askStr} · B:${bidStr}`, valCol: "#38bdf8", sub: `Offer ${activeOffer.contractType}: ${offerAskStr} / Pay ${payStr}` },
+        { label: "OVERALL SIGNAL", tag: pred.conf, val: pred.label, valCol: pred.color, sub: `Rating ${getRating(sym).grade} (${getRating(sym).score})` }
+      ];
+      taggedGridEl.innerHTML = taggedCards.map((c) => `<div class="tagCard"><div class="tagHead"><span>${c.label}</span><span class="tagBadge">${c.tag}</span></div><div class="tagNum" style="color:${c.valCol}">${c.val}</div><div class="tagSub">${c.sub}</div></div>`).join("");
+    }
+
+    function setStage(next) {
+      stage = next; stageTimer = 0;
+      const showMain = stage === "BRAIN" || stage === "CLUSTER_ZOOM";
+      pipelineWrap.classList.toggle("hidden", !showMain);
+      predPanel.classList.toggle("hidden", !showMain);
+      crawlerBadge.classList.toggle("hidden", !showMain);
+      spiderOverlay.classList.toggle("visible", stage === "SPIDER");
+      autoTraderOverlay.classList.toggle("visible", stage === "AUTOTRADER");
+      if (stage !== "TREEMAP") tmTooltip.style.display = "none";
+      if (stage === "SPIDER") { refreshOfferCards(); setTimeout(resizeAll, 30); }
+      if (stage === "AUTOTRADER") renderMultiShotSummary();
+      document.getElementById("btnTreemap").classList.toggle("active", stage === "TREEMAP");
+      document.getElementById("btnBrain").classList.toggle("active", showMain);
+      document.getElementById("btnCrawl").classList.toggle("active", stage === "SPIDER");
+      document.getElementById("btnAutoTrader").classList.toggle("active", stage === "AUTOTRADER");
+      updateMobileMenuBtnLabel();
+    }
+
+    function toggleAspectMode() {
+      stageWrap.classList.toggle("portrait");
+      closeMobileMenu();
+      setTimeout(resizeAll, 360);
+    }
+
+    document.getElementById("btnAuto").onclick = (e) => { autoMode = !autoMode; e.target.classList.toggle("active", autoMode); stageTimer = 0; closeMobileMenu(); };
+    document.getElementById("btnTreemap").onclick = () => { autoMode = false; document.getElementById("btnAuto").classList.remove("active"); setStage("TREEMAP"); closeMobileMenu(); };
+    document.getElementById("btnBrain").onclick   = () => { autoMode = false; document.getElementById("btnAuto").classList.remove("active"); setStage("BRAIN"); closeMobileMenu(); };
+    document.getElementById("btnCrawl").onclick   = () => { autoMode = false; document.getElementById("btnAuto").classList.remove("active"); setStage("SPIDER"); closeMobileMenu(); };
+    document.getElementById("btnAutoTrader").onclick = () => { autoMode = false; document.getElementById("btnAuto").classList.remove("active"); setStage("AUTOTRADER"); closeMobileMenu(); };
+    document.getElementById("btnAspect").onclick  = toggleAspectMode;
+    btnQuickAspect.onclick = toggleAspectMode;
+
+    stageWrap.addEventListener("mousemove", (e) => {
+      if (stage !== "TREEMAP" || symbolsDrawer.classList.contains("open")) { tmTooltip.style.display = "none"; hoveredCode = null; return; }
+      const rect = stageWrap.getBoundingClientRect(), mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      let hit = null;
+      for (const n of nodes.values()) { const t = n.tileRect; if (mx >= t.x && mx <= t.x + t.w && my >= t.y && my <= t.y + t.h) { hit = n; break; } }
+      if (hit) {
+        hoveredCode = hit.code; const sym = hit.catalogRef, pred = getOverallPrediction(sym);
+        tmTooltip.style.display = "block";
+        tmTooltip.style.left = `${Math.min(e.clientX + 14, window.innerWidth - 220)}px`;
+        tmTooltip.style.top = `${Math.min(e.clientY + 14, window.innerHeight - 110)}px`;
+        tmTooltip.innerHTML = `<div style="font-weight:800;color:#fff">${sym.code} <span style="color:#94a3b8;font-weight:400">${sym.name}</span></div><div>Price: <b style="color:#38bdf8">${fmtNum(sym.quote, sym.pipSize)}</b> (${sym.pct >= 0 ? "+" : ""}${sym.pct.toFixed(2)}%)</div><div>Signal: <b style="color:${pred.color}">${pred.label}</b></div>`;
+      } else { hoveredCode = null; tmTooltip.style.display = "none"; }
+    });
+
+    stageWrap.addEventListener("click", (e) => {
+      if (e.target.closest("button, select, input, #symbolsDrawer, #pipelineWrap, #predPanel, #spiderOverlay, #autoTraderOverlay, #loginModal, #topBar")) return;
+      if (stage !== "TREEMAP") return;
+      const rect = stageWrap.getBoundingClientRect(), mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      for (const n of nodes.values()) {
+        const t = n.tileRect;
+        if (mx >= t.x && mx <= t.x + t.w && my >= t.y && my <= t.y + t.h) { selectSymbol(n.code); setStage("BRAIN"); break; }
+      }
+    });
+
+    // =========================================================================
+    // 9. SPIDER & MAIN RENDER LOOP
+    // =========================================================================
+    let lastTime = performance.now();
+
+    function getHeatColor(sym) {
+      if (sym.quote === null) return "#1e293b";
+      const v = sym.pct;
+      if (v > 0.25 || (v === 0 && sym.delta > 0)) return "#089950";
+      if (v > 0.04) return "#0b8749";
+      if (v > 0) return "#0b6b3c";
+      if (v < -0.25 || (v === 0 && sym.delta < 0)) return "#dc2626";
+      if (v < -0.04) return "#b91c1c";
+      if (v < 0) return "#991b1b";
+      return sym.delta >= 0 ? "#0b7d45" : "#b91c1c";
+    }
+
+    function drawSpider(t) {
+      const w = spiderCanvas.clientWidth, h = spiderCanvas.clientHeight;
+      if (!w || !h) return;
+      spCtx.clearRect(0, 0, w, h);
+      spiderScrollVel *= 0.88;
+
+      const wrapBox = document.getElementById("sheetWrap").getBoundingClientRect();
+      const selRef = spiderRowRefs.get(selectedCode) || [...spiderRowRefs.values()][0];
+      let laneCx = w * 0.28, targetY = h * 0.45, leftTargetX = laneCx - 48, rightTargetX = laneCx + 48;
+
+      if (selRef?.laneEl) {
+        const lb = selRef.laneEl.getBoundingClientRect();
+        if (lb.width > 10) { laneCx = lb.left + lb.width / 2 - wrapBox.left; leftTargetX = lb.left - wrapBox.left - 10; rightTargetX = lb.right - wrapBox.left + 10; }
+        const rb = selRef.row.getBoundingClientRect(), relY = rb.top + rb.height / 2 - wrapBox.top;
+        targetY = relY >= 16 && relY <= h - 16 ? relY : Math.max(36, Math.min(h - 36, h * 0.45 + spiderScrollVel * 1.4));
+      }
+
+      spiderY += (targetY - spiderY) * 0.16;
+      const cx = laneCx + Math.sin(t * 2.2) * 5, cy = Math.max(24, Math.min(h - 24, spiderY + spiderScrollVel * 0.35));
+      const stride = Math.sin(t * 6 + spiderScroll.scrollTop * 0.1);
+
+      const feet = [
+        [leftTargetX, cy - 14 + stride * 4, "#38bdf8"], [leftTargetX, cy, "#f472b6"], [leftTargetX, cy + 14 - stride * 4, "#34d399"],
+        [rightTargetX, cy - 14 - stride * 4, "#38bdf8"], [rightTargetX, cy, "#f472b6"], [rightTargetX, cy + 14 + stride * 4, "#34d399"]
+      ];
+      spCtx.lineWidth = 1.8;
+      feet.forEach(([fx, fy, col], i) => {
+        const kx = (cx + fx) / 2 + (i < 3 ? -4 : 4), ky = (cy + fy) / 2 - 10;
+        spCtx.strokeStyle = col; spCtx.beginPath(); spCtx.moveTo(cx, cy); spCtx.lineTo(kx, ky); spCtx.lineTo(fx, fy); spCtx.stroke();
+        spCtx.fillStyle = "#ffffff"; spCtx.beginPath(); spCtx.arc(fx, fy, 2.5, 0, Math.PI * 2); spCtx.fill();
+      });
+
+      spCtx.shadowColor = Math.abs(spiderScrollVel) > 2 ? "#fde047" : "#f472b6";
+      spCtx.shadowBlur = 12; spCtx.fillStyle = "#0b1120";
+      spCtx.strokeStyle = Math.abs(spiderScrollVel) > 2 ? "#fde047" : "#f472b6";
+      spCtx.lineWidth = 2.2; spCtx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 + t * 0.4 + spiderScroll.scrollTop * 0.008;
+        const px = cx + Math.cos(a) * 11, py = cy + Math.sin(a) * 11;
+        if (i === 0) spCtx.moveTo(px, py); else spCtx.lineTo(px, py);
+      }
+      spCtx.closePath(); spCtx.fill(); spCtx.stroke(); spCtx.shadowBlur = 0;
+      spCtx.fillStyle = "#38bdf8"; spCtx.beginPath(); spCtx.arc(cx, cy, 3.2, 0, Math.PI * 2); spCtx.fill();
+    }
+
+    function loop(now) {
+      requestAnimationFrame(loop);
+      const dt = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime = now;
+      const t = now * 0.001;
+      stageTimer += dt;
+
+      if (autoMode && nodes.size) {
+        if (stage === "TREEMAP" && stageTimer > 4.5) setStage("BRAIN");
+        else if (stage === "BRAIN" && stageTimer > 8.5) setStage("SPIDER");
+        else if (stage === "SPIDER" && stageTimer > 6.5) setStage("AUTOTRADER");
+        else if (stage === "AUTOTRADER" && stageTimer > 7.5) setStage("TREEMAP");
+      }
+
+      treemapBlend += ((stage === "TREEMAP" ? 1 : 0) - treemapBlend) * 0.14;
+      for (const s of allSymbolsCatalog) { s.tickBlink *= 0.88; s.atrBlink *= 0.9; }
+
+      renderer.render(scene, camera);
+
+      const w = stageWrap.clientWidth, h = stageWrap.clientHeight;
+      fxCtx.clearRect(0, 0, w, h);
+
+      if (treemapBlend > 0.02 && clusters.size) {
+        fxCtx.save(); fxCtx.globalAlpha = treemapBlend;
+        for (const c of clusters.values()) {
+          const gr = c.treemapRect;
+          fxCtx.fillStyle = "#080b12"; fxCtx.fillRect(gr.x, gr.y, gr.w, gr.h);
+          fxCtx.fillStyle = "#e2e8f0"; fxCtx.font = "bold 11px sans-serif";
+          fxCtx.textAlign = "left"; fxCtx.textBaseline = "middle";
+          fxCtx.fillText(`${c.meta.name} ›`, gr.x + 6, gr.y + 11, Math.max(gr.w - 12, 10));
+
+          for (const n of c.nodes) {
+            const tr = n.tileRect, sym = n.catalogRef, isSel = n.code === selectedCode, isHov = n.code === hoveredCode, blink = sym.tickBlink;
+            fxCtx.fillStyle = getHeatColor(sym); fxCtx.fillRect(tr.x, tr.y, tr.w, tr.h);
+            if (blink > 0.08) { fxCtx.fillStyle = `rgba(255,255,255,${blink * 0.22})`; fxCtx.fillRect(tr.x, tr.y, tr.w, tr.h); }
+            fxCtx.strokeStyle = isSel ? "#fbbf24" : (isHov ? "#ffffff" : "#04060c");
+            fxCtx.lineWidth = isSel || isHov ? 2 : 1; fxCtx.strokeRect(tr.x, tr.y, tr.w, tr.h);
+
+            fxCtx.save(); fxCtx.beginPath(); fxCtx.rect(tr.x + 1, tr.y + 1, Math.max(tr.w - 2, 0), Math.max(tr.h - 2, 0)); fxCtx.clip();
+            const cx = tr.x + tr.w / 2, cy = tr.y + tr.h / 2, minDim = Math.min(tr.w, tr.h);
+            const tickerSize = Math.max(10, Math.min(28, Math.floor(minDim * 0.22)));
+            const priceSize = Math.max(10, Math.min(16, Math.floor(minDim * 0.14)));
+            const pctSize = Math.max(10, Math.min(13, Math.floor(minDim * 0.11)));
+            const livePrice = sym.quote !== null ? fmtNum(sym.quote, sym.pipSize) : "—";
+            const pctText = sym.quote !== null ? `${sym.pct >= 0 ? "+" : ""}${sym.pct.toFixed(2)}%` : "";
+
+            fxCtx.textAlign = "center"; fxCtx.textBaseline = "middle";
+            if (tr.w >= 95 && tr.h >= 95) {
+              const badgeR = Math.min(20, Math.max(12, minDim * 0.11));
+              const totalH = badgeR * 2 + 8 + tickerSize + priceSize + pctSize + 10;
+              let y = cy - totalH / 2 + badgeR;
+              fxCtx.fillStyle = "rgba(255,255,255,0.92)"; fxCtx.beginPath(); fxCtx.arc(cx, y, badgeR, 0, Math.PI * 2); fxCtx.fill();
+              fxCtx.fillStyle = "#060913"; fxCtx.font = `bold ${Math.max(10, Math.floor(badgeR * 0.9))}px sans-serif`; fxCtx.fillText(n.code.slice(0, 2), cx, y + 1);
+              y += badgeR + 6 + tickerSize * 0.5;
+              fxCtx.fillStyle = "#ffffff"; fxCtx.font = `bold ${tickerSize}px sans-serif`; fxCtx.fillText(n.code, cx, y, tr.w - 8);
+              y += tickerSize * 0.65 + priceSize * 0.55;
+              fxCtx.fillStyle = "#f1f5f9"; fxCtx.font = `bold ${priceSize}px monospace`; fxCtx.fillText(livePrice, cx, y, tr.w - 8);
+              if (pctText) { y += priceSize * 0.65 + pctSize * 0.55; fxCtx.fillStyle = "rgba(255,255,255,0.9)"; fxCtx.font = `${pctSize}px sans-serif`; fxCtx.fillText(pctText, cx, y, tr.w - 8); }
+            } else if (tr.w >= 34 && tr.h >= 28) {
+              const showPct = tr.h >= 54 && pctText, gap = 2, totalH = tickerSize + priceSize + gap + (showPct ? pctSize + gap : 0);
+              let y = cy - totalH / 2 + tickerSize / 2;
+              fxCtx.fillStyle = "#ffffff"; fxCtx.font = `bold ${tickerSize}px sans-serif`; fxCtx.fillText(n.code, cx, y, tr.w - 4);
+              y += tickerSize / 2 + gap + priceSize / 2;
+              fxCtx.fillStyle = "#f8fafc"; fxCtx.font = `${priceSize}px monospace`; fxCtx.fillText(livePrice, cx, y, tr.w - 4);
+              if (showPct) { y += priceSize / 2 + gap + pctSize / 2; fxCtx.fillStyle = "rgba(255,255,255,0.88)"; fxCtx.font = `${pctSize}px sans-serif`; fxCtx.fillText(pctText, cx, y, tr.w - 4); }
+            } else if (tr.w >= 18 && tr.h >= 14) {
+              fxCtx.fillStyle = "#ffffff"; fxCtx.font = "bold 10px sans-serif"; fxCtx.fillText(n.code, cx, cy, tr.w - 2);
+            }
+            fxCtx.restore();
+          }
+        }
+        fxCtx.restore();
+      }
+
+      if ((stage === "BRAIN" || stage === "CLUSTER_ZOOM") && nodes.size) {
+        const isMob = isMobileInterface();
+        const wrapRect = stageWrap.getBoundingClientRect(), pipeRect = pipelineWrap.getBoundingClientRect(), predRect = predPanel.getBoundingClientRect();
+        let cx, cy, R;
+        if (isMob) { cx = w * 0.5; cy = h * 0.51; R = Math.min(w * 0.28, h * 0.12); }
+        else { const leftEdge = pipeRect.right - wrapRect.left, rightEdge = predRect.left - wrapRect.left; cx = (leftEdge + rightEdge) / 2; cy = h * 0.53; R = Math.max(70, Math.min((rightEdge - leftEdge) * 0.34, h * 0.33)); }
+        crawlerBadge.style.left = `${cx}px`; crawlerBadge.style.top = `${cy - R - 34}px`;
+
+        const rotOffset = Math.sin(t * 0.15) * 0.08;
+        for (const n of nodes.values()) { n.curAngle = n.angle + rotOffset; n.ringPoint.x = cx + Math.cos(n.curAngle) * (R - 4); n.ringPoint.y = cy + Math.sin(n.curAngle) * (R - 4); }
+
+        const scrollBox = pipeScroll.getBoundingClientRect();
+        for (const [code, ref] of pipeRowRefs.entries()) {
+          const rBox = ref.row.getBoundingClientRect();
+          if (rBox.bottom < scrollBox.top || rBox.top > scrollBox.bottom) continue;
+          const node = nodes.get(code), sym = node?.catalogRef, isSel = code === selectedCode, atrBlink = sym ? sym.atrBlink : 0, tBlink = sym ? sym.tickBlink : 0, baseColor = node?.circosColor || "#38bdf8";
+          for (let i = 0; i < 4; i++) {
+            const cA = ref.cells[i].getBoundingClientRect(), cB = ref.cells[i + 1].getBoundingClientRect();
+            const x1 = cA.right - wrapRect.left, y1 = cA.top + cA.height / 2 - wrapRect.top, x2 = cB.left - wrapRect.left, y2 = cB.top + cB.height / 2 - wrapRect.top;
+            if (x2 <= scrollBox.right - wrapRect.left + 8) { fxCtx.strokeStyle = isSel ? "#f472b6" : baseColor; fxCtx.globalAlpha = isSel ? 0.95 : 0.45 + tBlink * 0.45; fxCtx.lineWidth = isSel ? 1.8 : 1.0; fxCtx.beginPath(); fxCtx.moveTo(x1, y1); fxCtx.lineTo(x2, y2); fxCtx.stroke(); }
+          }
+          const atrBox = ref.cells[4].getBoundingClientRect();
+          const ax = Math.min(atrBox.right - wrapRect.left, scrollBox.right - wrapRect.left), ay = atrBox.top + atrBox.height / 2 - wrapRect.top;
+          const tx = cx + Math.cos(node.curAngle) * (R + 24), ty = cy + Math.sin(node.curAngle) * (R + 24);
+          fxCtx.strokeStyle = atrBlink > 0.15 ? "#fde047" : (isSel ? "#f472b6" : baseColor);
+          fxCtx.globalAlpha = atrBlink > 0.15 ? 0.95 : (isSel ? 0.85 : 0.14 + tBlink * 0.65);
+          fxCtx.lineWidth = atrBlink > 0.15 ? 2.4 : (isSel ? 1.6 : 0.75 + tBlink * 1.1);
+          fxCtx.beginPath(); fxCtx.moveTo(ax, ay); fxCtx.bezierCurveTo(ax + 40, ay, cx - R - 35, ty, tx, ty); fxCtx.stroke();
+        }
+        fxCtx.globalAlpha = 1;
+
+        fxCtx.save(); fxCtx.beginPath(); fxCtx.arc(cx, cy, R - 4, 0, Math.PI * 2); fxCtx.clip();
+        fxCtx.fillStyle = "rgba(6, 10, 22, 0.72)"; fxCtx.fillRect(cx - R, cy - R, R * 2, R * 2);
+        for (const ch of circosChords) {
+          const nA = nodes.get(ch.aCode), nB = nodes.get(ch.bCode); if (!nA || !nB) continue;
+          const blink = Math.max(nA.catalogRef.tickBlink, nB.catalogRef.tickBlink), isSelChord = ch.aCode === selectedCode || ch.bCode === selectedCode;
+          const grad = fxCtx.createLinearGradient(nA.ringPoint.x, nA.ringPoint.y, nB.ringPoint.x, nB.ringPoint.y);
+          grad.addColorStop(0, `hsl(${ch.hueA}, 95%, ${blink > 0.2 ? 75 : 55}%)`); grad.addColorStop(1, `hsl(${ch.hueB}, 95%, ${blink > 0.2 ? 75 : 55}%)`);
+          fxCtx.strokeStyle = blink > 0.25 ? "#ffffff" : grad; fxCtx.globalAlpha = isSelChord ? 0.92 : (0.16 + blink * 0.82); fxCtx.lineWidth = isSelChord ? 2.0 : (0.7 + blink * 2.1);
+          fxCtx.beginPath(); fxCtx.moveTo(nA.ringPoint.x, nA.ringPoint.y); fxCtx.quadraticCurveTo(cx, cy, nB.ringPoint.x, nB.ringPoint.y); fxCtx.stroke();
+          if (blink > 0.15) {
+            const u = 1 - blink, sx = (1 - u) * (1 - u) * nA.ringPoint.x + 2 * (1 - u) * u * cx + u * u * nB.ringPoint.x, sy = (1 - u) * (1 - u) * nA.ringPoint.y + 2 * (1 - u) * u * cy + u * u * nB.ringPoint.y;
+            fxCtx.fillStyle = "#fde047"; fxCtx.globalAlpha = blink; fxCtx.beginPath(); fxCtx.arc(sx, sy, 2.5, 0, Math.PI * 2); fxCtx.fill();
+          }
+        }
+        fxCtx.restore();
+
+        const nList = [...nodes.values()];
+        nList.forEach((n, idx) => {
+          const a0 = n.curAngle - n.arcSpan * 0.44, a1 = n.curAngle + n.arcSpan * 0.44, blink = n.catalogRef.tickBlink, isSel = n.code === selectedCode;
+          fxCtx.strokeStyle = isSel ? "#ffffff" : n.circosColor; fxCtx.lineWidth = isSel ? 9 : 7; fxCtx.beginPath(); fxCtx.arc(cx, cy, R, a0, a1); fxCtx.stroke();
+          fxCtx.strokeStyle = getRsiState(n.catalogRef.rsi).color; fxCtx.lineWidth = 4; fxCtx.beginPath(); fxCtx.arc(cx, cy, R + 9, a0, a1); fxCtx.stroke();
+          fxCtx.strokeStyle = blink > 0.2 ? "#fde047" : `hsla(${n.hue}, 85%, 55%, 0.45)`; fxCtx.lineWidth = blink > 0.2 ? 6 : 3; fxCtx.beginPath(); fxCtx.arc(cx, cy, R + 16, a0, a1); fxCtx.stroke();
+          const step = Math.max(1, Math.floor(nList.length / 26));
+          if (idx % step === 0 || isSel || blink > 0.4) {
+            fxCtx.save(); fxCtx.translate(cx + Math.cos(n.curAngle) * (R + 24), cy + Math.sin(n.curAngle) * (R + 24));
+            let rot = n.curAngle; const flip = rot > Math.PI * 0.5 || rot < -Math.PI * 0.5; if (flip) rot += Math.PI;
+            fxCtx.rotate(rot); fxCtx.fillStyle = isSel ? "#fde047" : (blink > 0.4 ? "#ffffff" : n.circosColor); fxCtx.font = isSel ? "bold 10px monospace" : "10px monospace";
+            fxCtx.textAlign = flip ? "right" : "left"; fxCtx.textBaseline = "middle"; fxCtx.fillText(n.code, 0, 0); fxCtx.restore();
+          }
+        });
+
+        const predBox = predScroll.getBoundingClientRect();
+        for (const [code, rRef] of predRowRefs.entries()) {
+          const pBox = rRef.row.getBoundingClientRect();
+          if (pBox.bottom < predBox.top || pBox.top > predBox.bottom) continue;
+          const node = nodes.get(code); if (!node) continue;
+          const sym = node.catalogRef, isSel = code === selectedCode, blink = sym.tickBlink, predCol = getOverallPrediction(sym).color;
+          const sx = cx + Math.cos(node.curAngle) * (R + 18), sy = cy + Math.sin(node.curAngle) * (R + 18), ex = pBox.left - wrapRect.left, ey = pBox.top + pBox.height / 2 - wrapRect.top;
+          fxCtx.strokeStyle = blink > 0.2 ? "#fde047" : (isSel ? "#f472b6" : predCol); fxCtx.globalAlpha = blink > 0.2 ? 0.92 : (isSel ? 0.88 : 0.18); fxCtx.lineWidth = blink > 0.2 ? 2.1 : (isSel ? 1.6 : 0.8);
+          fxCtx.beginPath(); fxCtx.moveTo(sx, sy); fxCtx.bezierCurveTo(cx + R + 45, sy, ex - 45, ey, ex, ey); fxCtx.stroke();
+        }
+        fxCtx.globalAlpha = 1;
+      }
+
+      if (stage === "SPIDER") drawSpider(t);
+    }
+
+    resizeAll();
+    setStage("AUTOTRADER");
+    requestAnimationFrame(loop);
+  </script>
 </body>
 </html>
