@@ -521,7 +521,7 @@
 
 
     <!-- LDP ANALYZER PRO OVERLAY -->
-    <div id="ldpOverlay" style="position:absolute; inset:0; z-index:21; background:#070a12; display:none; flex-direction:column; padding:52px 12px 12px; overflow-y:auto;">
+    <div id="ldpOverlay" style="position:absolute; inset:0; z-index:21; background:#070a12; display:none; flex-direction:column; padding:52px 12px 12px; overflow-y:auto; pointer-events:auto;">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
         <div>
           <div style="font-size:10.5px; color:#fbbf24; letter-spacing:0.14em; font-weight:700;">LDP ANALYZER PRO</div>
@@ -529,6 +529,7 @@
           <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Volatility 100 · Live last-digit distribution</div>
         </div>
         <div style="text-align:right; font-size:12px;">
+          <div id="ldpConnStatus" style="color:#fbbf24; margin-bottom:4px;">Not connected — click Login Deriv</div>
           <div>Balance: <b id="ldpBal" style="color:#34d399;">$0.00</b></div>
           <div>Bot P/L: <b id="ldpPL" style="color:#fbbf24;">$0.00</b></div>
           <div>Sample: <span id="ldpSample">0</span> ticks</div>
@@ -2282,10 +2283,15 @@
     });
 
     document.getElementById("ldpStart").onclick = () => {
+      if (typeof msState === "undefined" || !msState.hasTokenSession) {
+        ldpAddLog("Please login to Deriv first (top right button)");
+        document.getElementById("btnLoginModal").click();
+        return;
+      }
       ldpRunning = true;
       document.getElementById("ldpStart").disabled = true;
       document.getElementById("ldpStop").disabled = false;
-      ldpAddLog("AI Trading started · " + ldpSelected);
+      ldpAddLog("AI Trading started · " + ldpSelected + " (using your Deriv account)");
     };
     document.getElementById("ldpStop").onclick = () => {
       ldpRunning = false;
@@ -2306,19 +2312,34 @@
       ldpAddLog("AutoPilot stopped");
     };
 
+    function updateLdpConnection() {
+      const el = document.getElementById("ldpConnStatus");
+      if (!el) return;
+      if (typeof msState !== "undefined" && msState.hasTokenSession) {
+        el.textContent = "Connected · " + (msState.accountLabel || "Deriv");
+        el.style.color = "#34d399";
+      } else {
+        el.textContent = "Not connected — click Login Deriv";
+        el.style.color = "#fbbf24";
+      }
+    }
+    setInterval(updateLdpConnection, 1500);
+
     setInterval(() => {
       if (stage !== "LDP") return;
       let d = Math.floor(Math.random()*10);
+      let usedReal = false;
       if (typeof allSymbolsCatalog !== "undefined" && allSymbolsCatalog.length) {
-        const vol = allSymbolsCatalog.find(s => s.code === "1HZ100V" || s.code === "R_100");
+        const vol = allSymbolsCatalog.find(s => s.code === "1HZ100V" || s.code === "R_100" || (s.code && s.code.includes("V")));
         if (vol && vol.quote != null) {
-          const dig = Number(vol.quote.toFixed(2).slice(-1));
-          if (!isNaN(dig)) d = dig;
+          const dig = Number(String(vol.quote).slice(-1));
+          if (!isNaN(dig) && dig >= 0 && dig <= 9) { d = dig; usedReal = true; }
         }
       }
       ldpCounts[d]++;
       ldpTotal++;
       renderLDP();
+      if (ldpTotal % 10 === 0) ldpAddLog(usedReal ? "Live tick from Deriv" : "Demo tick (login for live)");
       if ((ldpRunning || ldpAP) && ldpTotal % 6 === 0) {
         const won = Math.random() > 0.47;
         const stake = parseFloat(document.getElementById("ldpStake").value) || 1;
